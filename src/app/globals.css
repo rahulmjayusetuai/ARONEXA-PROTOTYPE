@@ -1,0 +1,1381 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #eef1f6;
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+.fg-smart,
+.fg-smart * {
+  transition-property: left, top, width, height, opacity, transform, scale, filter, background-color, border-color, color, box-shadow;
+  transition-duration: max(var(--fg-smart-ms, 150ms), 220ms);
+  transition-timing-function: ease-out;
+}
+
+/* The page stays clickable while a change is fading. */
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--fg-nav-ms, 320ms);
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root[data-fg-nav="move"]::view-transition-old(root) {
+  animation: none;
+}
+
+:root[data-fg-nav="move"]::view-transition-new(root) {
+  animation: fg-move var(--fg-nav-ms, 380ms) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fg-calendar-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* A copy of the old content fading away over the new. See softenContent in live/motion.ts. */
+.fg-soft-copy {
+  pointer-events: none;
+  animation: fg-fade-out 0.24s ease-out forwards;
+}
+
+.fg-soft-copy .lv-cal {
+  view-transition-name: none;
+}
+
+.fg-soft-copy video {
+  visibility: hidden;
+}
+
+.lv-grid-days,
+.lv-months {
+  animation: fg-fade 0.2s ease-out;
+}
+
+.lv-pop.is-leaving {
+  pointer-events: none;
+  animation: fg-fade-out 0.16s ease-in forwards;
+}
+
+.lv-appt-card {
+  transition: background-color 0.22s ease-out, border-color 0.22s ease-out, box-shadow 0.22s ease-out;
+}
+
+/* First-visit guide. It sits above everything, including the calendar and other dialogs. */
+.lv-backdrop.lv-guide {
+  z-index: 100;
+}
+
+/* Tall enough for the longest step, so the buttons stay put from step to step. */
+.lv-guide .lv-dialog-body {
+  min-height: 268px;
+}
+
+.lv-guide .lv-dialog-foot {
+  justify-content: flex-end;
+}
+
+.lv-guide-skip {
+  margin-right: auto;
+}
+
+.lv-guide-step {
+  font-size: 15px;
+  line-height: 1.5;
+  animation: fg-fade 0.24s ease-out;
+}
+
+.lv-guide-step p {
+  margin: 0 0 12px;
+}
+
+.lv-guide-step ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.lv-guide-step li + li {
+  margin-top: 10px;
+}
+
+/* The calendar panel eases in and out by itself while the page behind it cross-fades. */
+.lv-cal {
+  view-transition-name: fg-calendar;
+}
+
+::view-transition-group(fg-calendar),
+::view-transition-old(fg-calendar),
+::view-transition-new(fg-calendar) {
+  animation-duration: var(--fg-nav-ms, 450ms);
+}
+
+::view-transition-new(fg-calendar):only-child {
+  animation: fg-calendar-in var(--fg-nav-ms, 450ms) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+::view-transition-old(fg-calendar):only-child {
+  animation: fg-calendar-out 280ms ease-in both;
+}
+
+@keyframes fg-calendar-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
+  }
+}
+
+@keyframes fg-calendar-out {
+  to {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+}
+
+/* Press feedback, using "scale" so it can't undo a layer's own rotation. */
+[role="button"],
+[role="checkbox"],
+button {
+  transition: scale 0.16s ease-out, filter 0.16s ease-out, background-color 0.22s ease-out, border-color 0.22s ease-out, color 0.22s ease-out, box-shadow 0.22s ease-out;
+}
+
+[role="button"]:active,
+[role="checkbox"]:active {
+  filter: brightness(0.97);
+}
+
+[data-press]:active,
+button:not(.fg-field):active {
+  scale: 0.97;
+}
+
+.fg-page {
+  animation: fg-fade 0.25s ease-out;
+}
+
+@keyframes fg-move {
+  from {
+    transform: translate(var(--fg-from-x, 0), var(--fg-from-y, 0));
+  }
+}
+
+.fg-field::placeholder {
+  color: var(--ph);
+  opacity: 1;
+}
+
+.fg-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  overflow: auto;
+  padding: 24px;
+  background: rgba(3, 28, 84, 0.45);
+  animation: fg-fade 0.18s ease-out;
+}
+
+.fg-modal {
+  position: relative;
+  flex: none;
+  margin: auto;
+  animation: fg-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fg-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  z-index: 60;
+  transform: translateX(-50%);
+  animation: fg-slip-up 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fg-notice {
+  position: fixed;
+  left: 50%;
+  top: 24px;
+  z-index: 95;
+  transform: translateX(-50%);
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: #031c54;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  animation: fg-slip-down 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* One pop-up replacing another: the dimmed page behind them stays still. */
+.fg-backdrop.is-swap {
+  animation: none;
+}
+
+/* Copies of closing pop-ups, made in live/motion.ts. */
+.fg-backdrop.is-leaving,
+.lv-backdrop.is-leaving {
+  pointer-events: none;
+  animation: fg-fade-out 0.24s ease-in forwards;
+}
+
+.is-leaving > .fg-modal,
+.is-leaving > .lv-dialog {
+  animation: fg-sink 0.24s ease-in forwards;
+}
+
+.fg-backdrop.is-leaving.is-swapped {
+  background: transparent;
+  animation: none;
+}
+
+.is-swapped > .fg-modal {
+  animation: fg-fade-out 0.16s ease-in forwards;
+}
+
+.fg-toast.is-leaving {
+  pointer-events: none;
+  animation: fg-slip-away 0.24s ease-in forwards;
+}
+
+.fg-notice.is-leaving {
+  pointer-events: none;
+  animation: fg-slip-away 0.24s ease-in forwards;
+}
+
+@keyframes fg-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes fg-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+
+@keyframes fg-sink {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes fg-slip-up {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+}
+
+@keyframes fg-slip-down {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+}
+
+@keyframes fg-slip-away {
+  to {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+@keyframes fg-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.fg-loading {
+  padding: 48px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+@keyframes fg-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Body map pins: the open organ pulses softly, and the others lift on hover. */
+[data-anim="pin"] {
+  transition: transform 0.18s ease;
+}
+
+[data-anim="pin"]:hover {
+  transform: scale(1.08);
+}
+
+/* Keeps the ring behind the pin's count badge. */
+[data-anim="pin-on"] {
+  isolation: isolate;
+}
+
+[data-anim="pin-on"]::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid #14b8a6;
+  pointer-events: none;
+  animation: lv-pin-pulse 2.4s ease-out infinite;
+}
+
+@keyframes lv-pin-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  70%,
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* "html" outranks the animations set further down this file. */
+  html .fg-page,
+  html .fg-modal,
+  html .fg-toast,
+  html .fg-notice,
+  html .lv-dialog,
+  html .lv-pop,
+  html .lv-grid-days,
+  html .lv-months,
+  html .lv-guide-step {
+    animation: none;
+  }
+
+  [role="button"],
+  [role="checkbox"],
+  button {
+    transition: none;
+  }
+
+  [data-press]:active,
+  button:not(.fg-field):active {
+    scale: none;
+  }
+
+  [data-anim="pin"] {
+    transition: none;
+  }
+
+  [data-anim="pin"]:hover {
+    transform: none;
+  }
+
+  [data-anim="pin-on"]::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* Live controls: drawn in the same colours and sizes as the designed screens. */
+:root {
+  --lv-navy: #031c54;
+  --lv-teal: #14b8a6;
+  --lv-mint: #c7ffeb;
+  --lv-line: #e2e8f0;
+  --lv-ink: #0f172a;
+  --lv-mute: #64748b;
+  --lv-soft: #f8fafc;
+}
+
+html.fg-dark {
+  filter: invert(0.92) hue-rotate(180deg);
+}
+
+html.fg-dark img,
+html.fg-dark .lv-photo {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+[role="button"]:focus-visible,
+.lv-cal button:focus-visible,
+.lv-dialog button:focus-visible,
+.lv-dialog input:focus-visible,
+.lv-dialog select:focus-visible,
+.lv-dialog textarea:focus-visible,
+.lv-fieldbtn:focus-visible {
+  outline: 2px solid var(--lv-teal);
+  outline-offset: 2px;
+}
+
+.lv-fieldbtn {
+  display: block;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lv-pop {
+  position: fixed;
+  z-index: 90;
+  overflow: auto;
+  max-height: 340px;
+  padding: 8px;
+  border: 1px solid var(--lv-line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(3, 28, 84, 0.22);
+  animation: fg-pop 0.2s ease-out;
+}
+
+.lv-options {
+  display: flex;
+  flex-direction: column;
+}
+
+.lv-options button {
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--lv-ink);
+  font: 500 14px var(--font-manrope), sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lv-options button:hover {
+  background: #eef2f7;
+}
+
+.lv-options button.is-on {
+  background: var(--lv-navy);
+  color: #fff;
+}
+
+.lv-grid-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.lv-grid-head b {
+  flex: 1;
+  color: var(--lv-navy);
+  font-size: 14px;
+  text-align: center;
+}
+
+.lv-grid-head button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: #eef2f7;
+  color: var(--lv-navy);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.lv-grid-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+
+.lv-grid-days small {
+  padding: 4px 0;
+  color: var(--lv-mute);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lv-grid-days button {
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--lv-ink);
+  font: 500 13px var(--font-manrope), sans-serif;
+  cursor: pointer;
+}
+
+.lv-grid-days button:hover {
+  background: #eef2f7;
+}
+
+.lv-grid-days button.is-today {
+  box-shadow: inset 0 0 0 1px var(--lv-teal);
+}
+
+.lv-grid-days button.is-on {
+  background: var(--lv-navy);
+  color: #fff;
+}
+
+/* Calendar */
+.lv-cal {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(3, 28, 84, 0.3);
+  color: var(--lv-ink);
+  font-family: var(--font-manrope), sans-serif;
+}
+
+.lv-cal button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.lv-cal-head {
+  flex: none;
+  height: 138px;
+  padding: 20px 24px;
+  background: var(--lv-navy);
+  color: #fff;
+}
+
+.lv-cal-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  height: 58px;
+}
+
+.lv-cal-title small {
+  display: block;
+  color: #b8c7e6;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.lv-cal-title b {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.lv-round {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  font-size: 16px;
+}
+
+.lv-round:hover,
+.lv-month:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.lv-cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lv-month {
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.lv-month span {
+  margin-left: 6px;
+  font-size: 11px;
+}
+
+.lv-today {
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--lv-mint);
+  color: var(--lv-navy);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lv-cal-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.lv-cal-days {
+  flex: none;
+  width: 270px;
+  overflow-y: auto;
+  padding: 16px;
+  border-right: 1px solid var(--lv-line);
+}
+
+.lv-day {
+  display: flex;
+  align-items: center;
+  width: 237px;
+  height: 58px;
+  margin-bottom: 6px;
+  padding: 0 12px;
+  gap: 12px;
+  border: 1px solid var(--lv-line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--lv-ink);
+  text-align: left;
+}
+
+.lv-day:hover {
+  border-color: var(--lv-teal);
+}
+
+.lv-day-closed {
+  background: var(--lv-soft);
+}
+
+.lv-day-leave {
+  border-color: #fde2c4;
+  background: #fff8ef;
+}
+
+.lv-day.is-on {
+  border-color: var(--lv-navy);
+  background: var(--lv-navy);
+  color: #fff;
+}
+
+.lv-day-num {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  width: 40px;
+}
+
+.lv-day-num small {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.lv-day-num b {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 26px;
+}
+
+.lv-day-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lv-day-text b {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.lv-day-text small {
+  color: var(--lv-mute);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.lv-day.is-on .lv-day-text small {
+  color: #b8c7e6;
+}
+
+.lv-cal-day {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.lv-cal-dayhead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.lv-cal-dayhead h2 {
+  margin: 0;
+  color: var(--lv-ink);
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.lv-cal-dayhead p {
+  margin: 2px 0 0;
+  color: var(--lv-mute);
+  font-size: 13px;
+}
+
+.lv-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.lv-btn {
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--lv-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--lv-navy);
+  font: 600 14px var(--font-manrope), sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lv-btn:hover {
+  background: #f1f5f9;
+}
+
+.lv-btn-dark {
+  border-color: var(--lv-navy);
+  background: var(--lv-navy);
+  color: #fff;
+}
+
+.lv-btn-dark:hover {
+  background: #0a2c78;
+}
+
+.lv-btn-sm {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.lv-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fff4e5;
+  color: #8a4b08;
+  font-size: 13px;
+}
+
+.lv-appts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lv-empty {
+  padding: 40px 0;
+  color: var(--lv-mute);
+  font-size: 14px;
+  text-align: center;
+}
+
+.lv-appt {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+  gap: 12px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.lv-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 3px solid #eef2f7;
+  border-radius: 50%;
+  background: var(--lv-navy);
+}
+
+.lv-dot.is-seen {
+  background: #e2e8f0;
+}
+
+.lv-dot.is-now {
+  background: var(--lv-teal);
+}
+
+.lv-dot.is-block {
+  background: #d97706;
+}
+
+.lv-appt-card {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  min-height: 67px;
+  padding: 0 14px;
+  gap: 14px;
+  border: 1px solid var(--lv-line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.lv-appt:hover .lv-appt-card {
+  border-color: var(--lv-teal);
+}
+
+.lv-appt.is-now .lv-appt-card {
+  border-color: var(--lv-teal);
+}
+
+.lv-appt.is-moved .lv-appt-card {
+  background: var(--lv-soft);
+  opacity: 0.75;
+}
+
+.lv-appt-time {
+  flex: none;
+  color: var(--lv-navy);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.lv-avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--lv-mint);
+  color: var(--lv-navy);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lv-appt-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lv-appt-text b {
+  color: var(--lv-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.lv-appt-text small {
+  color: var(--lv-mute);
+  font-size: 13px;
+}
+
+.lv-pill {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lv-pill-seen {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.lv-pill-now {
+  background: var(--lv-mint);
+  color: #065f46;
+}
+
+.lv-pill-booked {
+  background: #e0e7ff;
+  color: #1e3a8a;
+}
+
+.lv-pill-leave,
+.lv-pill-amber {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.lv-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lv-block > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px dashed #d97706;
+  border-radius: 16px;
+  background: #fff8ef;
+  font-size: 14px;
+}
+
+.lv-block small {
+  color: var(--lv-mute);
+  font-size: 12px;
+}
+
+.lv-link {
+  border: 0;
+  background: none;
+  color: var(--lv-navy);
+  font: 600 13px var(--font-manrope), sans-serif;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Dialogs */
+.lv-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  overflow: auto;
+  padding: 24px;
+  background: rgba(3, 28, 84, 0.45);
+  animation: fg-fade 0.18s ease-out;
+}
+
+.lv-dialog {
+  flex: none;
+  width: min(560px, 100%);
+  margin: auto;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(3, 28, 84, 0.3);
+  animation: fg-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  color: var(--lv-ink);
+  font-family: var(--font-manrope), sans-serif;
+}
+
+.lv-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  background: var(--lv-navy);
+  color: #fff;
+}
+
+.lv-dialog-head h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.lv-dialog-head p {
+  margin: 2px 0 0;
+  color: #b8c7e6;
+  font-size: 13px;
+}
+
+.lv-dialog-body {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px;
+  gap: 14px;
+}
+
+.lv-dialog-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 24px;
+  gap: 8px;
+  background: var(--lv-soft);
+}
+
+.lv-form-row {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 12px;
+}
+
+.lv-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--lv-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lv-input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--lv-ink);
+  font: 500 14px var(--font-manrope), sans-serif;
+  text-align: left;
+}
+
+textarea.lv-input {
+  height: 76px;
+  padding: 10px 14px;
+  resize: vertical;
+}
+
+.lv-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lv-help {
+  margin: 0;
+  color: var(--lv-mute);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lv-chip {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--lv-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--lv-ink);
+  font: 500 13px var(--font-manrope), sans-serif;
+  cursor: pointer;
+}
+
+.lv-chip.is-on {
+  border-color: var(--lv-navy);
+  background: var(--lv-navy);
+  color: #fff;
+}
+
+.lv-months {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.lv-yearbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.lv-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.lv-facts div {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--lv-soft);
+}
+
+.lv-facts small {
+  display: block;
+  color: var(--lv-mute);
+  font-size: 12px;
+}
+
+.lv-facts b {
+  font-size: 14px;
+}
+
+.lv-devices li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--lv-line);
+  font-size: 14px;
+}
+
+.lv-devices {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lv-selfie {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 14px;
+  background: #0f172a;
+  object-fit: cover;
+}
+
+/* Billing card, range tabs, rows */
+.lv-bill {
+  height: 100%;
+  padding: 21px;
+  border-radius: 20px;
+  background: #fff;
+  font-family: var(--font-manrope), sans-serif;
+}
+
+.lv-bill h3 {
+  margin: 0 0 12px;
+  color: var(--lv-ink);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.lv-bill table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.lv-bill th {
+  padding: 8px 8px 8px 0;
+  border-bottom: 1px solid var(--lv-line);
+  color: var(--lv-mute);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.lv-bill td {
+  height: 49px;
+  padding-right: 8px;
+  border-bottom: 1px solid var(--lv-line);
+  color: var(--lv-ink);
+}
+
+.lv-bill tfoot td {
+  border-bottom: 0;
+  font-size: 14px;
+}
+
+.lv-right {
+  text-align: right;
+}
+
+.lv-token {
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: var(--lv-navy);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lv-seg {
+  display: flex;
+  height: 44px;
+  padding: 5px;
+  gap: 4px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.lv-seg button {
+  flex: auto;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #475569;
+  font: 600 13px var(--font-manrope), sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lv-seg button.is-on {
+  background: var(--lv-navy);
+  color: #fff;
+}
+
+.lv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 14px 20px;
+  gap: 14px;
+  border: 1px solid var(--lv-teal);
+  border-radius: 16px;
+  background: #f4fffb;
+  font-family: var(--font-manrope), sans-serif;
+}
+
+.lv-row-warn {
+  border-color: #fdba74;
+  background: #fff8ef;
+}
+
+.lv-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+  color: var(--lv-ink);
+  font-size: 13px;
+}
+
+.lv-row-text b {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.lv-row-text small {
+  color: var(--lv-mute);
+  font-size: 12px;
+}
+
+.lv-measure {
+  position: relative;
+  cursor: crosshair;
+  background: rgba(20, 184, 166, 0.05);
+  outline: 2px dashed var(--lv-teal);
+}
+
+.lv-measure-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--lv-navy);
+}
+
+.lv-measure-span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(3, 28, 84, 0.12);
+}
+
+.lv-measure-tag {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--lv-navy);
+  color: #fff;
+  font: 600 13px var(--font-manrope), sans-serif;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.lv-player {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  gap: 10px;
+  color: #fff;
+  font: 600 12px var(--font-manrope), sans-serif;
+}
+
+.lv-video {
+  position: relative;
+}
+
+.lv-video video {
+  display: block;
+  width: 100%;
+  height: 340px;
+  cursor: pointer;
+}
+
+.lv-video .lv-player {
+  position: absolute;
+  left: 26px;
+  right: 26px;
+  top: 340px;
+}
+
+.lv-lang {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.lv-player .lv-lang button {
+  width: auto;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgb(11, 42, 111);
+  color: rgb(184, 199, 230);
+  font: 700 11px var(--font-manrope), sans-serif;
+}
+
+.lv-player .lv-lang button[lang="ml"] {
+  font-family: var(--font-anek-malayalam), sans-serif;
+}
+
+.lv-player .lv-lang button.on {
+  background: rgb(20, 184, 166);
+  color: rgb(3, 28, 84);
+}
+
+.lv-player button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.lv-player input {
+  flex: 1;
+  accent-color: var(--lv-teal);
+}
