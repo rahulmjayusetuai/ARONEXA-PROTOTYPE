@@ -1,22 +1,18 @@
 <div align="center">
 
-# AroNexa
+<img src="docs/readme/banner.svg" alt="AroNexa. See every patient's full story. Explain it in their language." width="100%" />
 
-### Bridging healthcare with intelligence
+<br /><br />
 
-See every patient's full story. Explain it in their language.
+<a href="https://aronexa-prototype.vercel.app"><img src="https://img.shields.io/badge/Open_the_live_prototype-14B8A6?style=for-the-badge&logoColor=white" alt="Open the live prototype" /></a>
 
-**[Open the live prototype →](https://aronexa-prototype.vercel.app)**
+<br /><br />
 
-![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
-![Languages](https://img.shields.io/badge/Languages-English_%7C_Malayalam-14B8A6?style=flat-square)
-
-<br />
-
-<img src="docs/screenshots/doctor-body-map.png" alt="Doctor view of a patient's body map, showing heart records, vitals and lab results" width="900" />
+![Next.js](https://img.shields.io/badge/Next.js-16-031C54?style=flat-square&logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-19-031C54?style=flat-square&logo=react&logoColor=C7FFEB)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-031C54?style=flat-square&logo=typescript&logoColor=C7FFEB)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-031C54?style=flat-square&logo=tailwindcss&logoColor=C7FFEB)
+![Languages](https://img.shields.io/badge/English_%2B_Malayalam-14B8A6?style=flat-square)
 
 </div>
 
@@ -24,15 +20,37 @@ See every patient's full story. Explain it in their language.
 
 AroNexa is a clickable healthcare prototype with two connected sides: a workspace for doctors and an app for their patients. Records are organised around an interactive body map, so a doctor can click an organ, see its reports, and explain the results in English or Malayalam.
 
+<img src="docs/readme/highlights.svg" alt="Highlights: body map, scan comparison, explanations in English and Malayalam, and a live queue." width="100%" />
+
 > [!NOTE]
 > This is a frontend-only prototype for computer screens. There is no backend, every patient and doctor is made up, and it is not for real medical use.
+
+<div align="center"><img src="docs/readme/divider.svg" alt="" width="70%" /></div>
+
+## See it in motion
+
+These are recordings of the real prototype.
+
+### The doctor's day
+
+Sign in, open a patient's record, and click through the body map.
+
+<img src="docs/readme/doctor-flow.gif" alt="Recording of a doctor signing in, opening James Heatfield's record, and clicking the lungs and brain on the body map" width="100%" />
+
+### The patient's side
+
+Sign in, then check your body map, your place in the queue, and your appointments.
+
+<img src="docs/readme/patient-flow.gif" alt="Recording of a patient signing in and moving through My body, Queue and Appointments" width="100%" />
+
+<div align="center"><img src="docs/readme/divider.svg" alt="" width="70%" /></div>
 
 ## Features
 
 <table>
 <tr>
-<th width="50%">For doctors</th>
-<th width="50%">For patients</th>
+<th width="50%">🩺 For doctors</th>
+<th width="50%">💙 For patients</th>
 </tr>
 <tr valign="top">
 <td>
@@ -62,7 +80,9 @@ AroNexa is a clickable healthcare prototype with two connected sides: a workspac
 </tr>
 </table>
 
-## A look inside
+<details>
+<summary><b>View more screenshots</b></summary>
+<br />
 
 <table>
 <tr>
@@ -74,14 +94,24 @@ AroNexa is a clickable healthcare prototype with two connected sides: a workspac
 <td align="center"><b>Patient home</b></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/sign-in.png" alt="Sign-in page with doctor and patient tabs and a language switch" /></td>
+<td width="50%"><img src="docs/screenshots/doctor-body-map.png" alt="Doctor view of a patient's body map, showing heart records, vitals and lab results" /></td>
 <td width="50%"><img src="docs/screenshots/patient-body-map.png" alt="Patient view of the body map with heart records" /></td>
 </tr>
 <tr>
-<td align="center"><b>Sign in</b></td>
+<td align="center"><b>Doctor body map</b></td>
 <td align="center"><b>Patient body map</b></td>
 </tr>
+<tr>
+<td colspan="2"><img src="docs/screenshots/sign-in.png" alt="Sign-in page with doctor and patient tabs and a language switch" /></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><b>Sign in</b></td>
+</tr>
 </table>
+
+</details>
+
+<div align="center"><img src="docs/readme/divider.svg" alt="" width="70%" /></div>
 
 ## Run it locally
 
@@ -133,4 +163,3 @@ flowchart LR
 - **Saved changes:** anything you change lasts until the browser tab closes.
 - **Simulated actions:** messages, calls, lab orders and council checks don't reach anyone.
 - **Screen size:** it's designed for computers, and phone layouts aren't included.
-
