@@ -43,6 +43,24 @@ Sign in, then check your body map, your place in the queue, and your appointment
 
 <img src="docs/readme/patient-flow.gif" alt="Recording of a patient signing in and moving through My body, Queue and Appointments" width="100%" />
 
+### The pharmacy
+
+Open a request, send a quote, approve a substitute, bill a walk-in customer and ask dealers for stock.
+
+<img src="docs/readme/pharmacy-flow.gif" alt="Recording of the pharmacy portal: opening a request, sending a quote, approving a substitute, billing at the counter and asking dealers for quotes" width="100%" />
+
+### The clinic
+
+Check patients in, collect fees, offer a late patient's slot to someone else, and invite staff.
+
+<img src="docs/readme/clinic-flow.gif" alt="Recording of the clinic portal: the live queue, checking a patient in, collecting a fee, offering a slot and inviting staff" width="100%" />
+
+### The lab
+
+Assign a home collector, handle requests, upload report files, then review and publish as the pathologist.
+
+<img src="docs/readme/lab-flow.gif" alt="Recording of the lab portal: assigning a collector, rejecting a request, uploading report files, and the pathologist reviewing and publishing a report" width="100%" />
+
 <div align="center"><img src="docs/readme/divider.svg" alt="" width="70%" /></div>
 
 ## Features
