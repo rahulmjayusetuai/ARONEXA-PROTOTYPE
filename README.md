@@ -157,6 +157,21 @@ flowchart LR
 | `public/design/` | Screen data, images and vector graphics |
 | `public/video/` | ECG explainer videos in English and Malayalam |
 
+## Other areas
+
+Besides `/doctor` and `/patient`, these parts of the product open at their own address. Each starts at its sign-in page.
+
+| Address | Who it's for |
+| --- | --- |
+| `/pharmacy` | Pharmacy staff: requests, quotes, substitutes, orders, deliveries, counter billing, stock, dealers and reports |
+| `/clinic` | Reception (live queue, walk-ins, appointments) and the clinic admin |
+| `/lab` | Lab staff and the pathologist |
+| `/rider` | Delivery riders (a phone-sized app) |
+| `/team` | The AroNexa platform and support teams |
+| `/partner` | Insurers, medicine dealers and sellers |
+
+New frames from Figma are added with the tools in `scripts/figma-export`.
+
 ## Good to know
 
 - **Sample date:** "today" is always Thursday, 15 May 2025, to match the sample data.

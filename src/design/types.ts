@@ -76,6 +76,8 @@ export type DesignNode = {
   anim?: string;
 };
 
+export type Area = "patient" | "pharmacy" | "clinic" | "lab" | "rider" | "team" | "partner";
+
 export type Screen = {
   id: string;
   name: string;
@@ -83,12 +85,14 @@ export type Screen = {
   w: number;
   h: number;
   file: string;
-  module?: "patient";
+  module?: Area;
 };
 
 export type Manifest = {
   start: string;
   patientStart: string;
+  // Each area beyond the doctor and patient apps: its sign-in page and its home page.
+  areas: Record<string, { start: string; home: string }>;
   screens: Screen[];
   compSets: Record<string, string>;
   images: Record<string, string>;

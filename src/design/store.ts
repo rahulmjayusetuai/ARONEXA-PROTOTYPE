@@ -157,6 +157,7 @@ export function pathFor(id: string) {
   const s = screensById.get(id);
   if (!s || s.id === manifest.start) return "/doctor";
   if (s.id === manifest.patientStart) return "/patient";
+  if (s.module && s.module !== "patient" && s.id === manifest.areas[s.module]?.start) return `/${s.module}`;
   return `/${s.module ?? "doctor"}/${s.slug}`;
 }
 
@@ -244,7 +245,8 @@ export function runActions(
         window.history.back();
       } else {
         // Opened straight from a link, so there is nothing to go back to inside the app.
-        const home = screensById.get(useDesign.getState().screen)?.module ? PATIENT_HOME : HOME;
+        const area = screensById.get(useDesign.getState().screen)?.module;
+        const home = area === "patient" ? PATIENT_HOME : area ? manifest.areas[area]?.home ?? HOME : HOME;
         goTo(home);
       }
     } else if (act.k === "url") window.open(to, "_blank", "noopener");

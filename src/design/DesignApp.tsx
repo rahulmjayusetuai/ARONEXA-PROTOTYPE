@@ -25,7 +25,7 @@ function useZoom() {
 
 function screenFromPath(path: string) {
   const [area, slug] = path.split("/").filter(Boolean);
-  const start = area === "patient" ? manifest.patientStart : manifest.start;
+  const start = area === "patient" ? manifest.patientStart : (manifest.areas[area]?.start ?? manifest.start);
   return (slug && screensBySlug.get(slug)?.id) || start;
 }
 
@@ -55,7 +55,7 @@ function calendarLayer(doc: DesignNode) {
 const shownData = (s: ReturnType<typeof useLive.getState>) =>
   JSON.stringify([liveKey(s), s.texts, s.theme, s.calDate, s.calMonth, s.filters.reveal]);
 
-const isToast = (id: string) => /^P?Toast/.test(screensById.get(id)?.name ?? "");
+const isToast = (id: string) => /^(P|Ph|Rc|Ca|Lb|Pa|Pl|Sp|In|Dl|Sl|Rider)?Toast/.test(screensById.get(id)?.name ?? "");
 
 function OverlayView({ overlay, zoom }: { overlay: Overlay; zoom: number }) {
   const closeOverlay = useDesign((s) => s.closeOverlay);
@@ -89,7 +89,7 @@ export function DesignApp({ path }: { path: string }) {
   const overlays = useDesign((s) => s.overlays);
   const notice = useDesign((s) => s.notice);
   const setNotice = useDesign((s) => s.setNotice);
-  const zoom = useZoom();
+  const fullZoom = useZoom();
   const [ready, setReady] = useState<string | null>(null);
   const theme = useLive((s) => s.theme);
 
@@ -166,6 +166,8 @@ export function DesignApp({ path }: { path: string }) {
   const pageId = calendar ? behind! : screen;
   const pageDoc = calendar ? behindDoc : doc;
   const size = screensById.get(pageId);
+  // The rider app is a phone design, so it keeps its own size instead of filling a wide window.
+  const zoom = size && size.w < 600 ? Math.min(1, (fullZoom * 1440) / size.w) : fullZoom;
   if (!pageDoc || !size) return <div className="fg-loading">Loading…</div>;
 
   return (
@@ -185,10 +187,10 @@ export function DesignApp({ path }: { path: string }) {
         <OverlayView key={o.key} overlay={o} zoom={zoom} />
       ))}
       <LiveModals />
-      <Guide
+      {(!screensById.get(screen)?.module || screensById.get(screen)?.module === "patient") && <Guide
         area={screensById.get(screen)?.module === "patient" ? "patient" : "doctor"}
         entered={!/^(Login|Register|Patient sign up)/.test(screensById.get(screen)?.name ?? "")}
-      />
+      />}
       {notice && <div className="fg-notice" role="status">{notice}</div>}
     </>
   );

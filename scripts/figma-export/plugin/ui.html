@@ -1,0 +1,23 @@
+<div style="font:13px Inter,system-ui,sans-serif;padding:12px;display:flex;flex-direction:column;gap:8px">
+  <label>Frame names to export (regular expression)
+    <input id="p" style="width:100%;box-sizing:border-box;padding:6px" value="^(Login · (Pharmacy|Clinic staff|Lab|AroNexa team|Insurer|Dealer|Seller)|Pharmacy (web|register)|Ph(Modal|Toast)|PModal / Confirm pharmacy|PToast / Periyar|Reception web|Rc(Modal|Toast)|ClinicAdmin web|Ca(Modal|Toast)|Lab web|Lb(Modal|Toast)|Pathologist web|Pa(Modal|Toast)|Rider|Platform web|Pl(Modal|Toast)|Support web|Sp(Modal|Toast)|Insurer web|In(Modal|Toast)|Dealer web|Dl(Modal|Toast)|Seller web|Sl(Modal|Toast)|Patient web / Compare lab quotes)">
+  </label>
+  <button id="go" style="padding:8px;background:#031c54;color:#fff;border:0;border-radius:6px">Export</button>
+  <div id="s" style="color:#475569">Open the page with the frames, then press Export.</div>
+  <a id="dl" style="display:none">Download aronexa-export.json</a>
+</div>
+<script>
+const s = document.getElementById("s"), dl = document.getElementById("dl");
+document.getElementById("go").onclick = () => { s.textContent = "Exporting…"; parent.postMessage({ pluginMessage: { type: "export", pattern: document.getElementById("p").value } }, "*"); };
+onmessage = (e) => {
+  const m = e.data.pluginMessage;
+  if (m.type === "progress") s.textContent = m.text;
+  if (m.type === "error") s.textContent = "Error: " + m.message;
+  if (m.type === "done") {
+    const url = URL.createObjectURL(new Blob([m.json], { type: "application/json" }));
+    dl.href = url; dl.download = "aronexa-export.json"; dl.style.display = "block";
+    s.textContent = m.count + " frames exported.";
+    dl.click();
+  }
+};
+</script>
