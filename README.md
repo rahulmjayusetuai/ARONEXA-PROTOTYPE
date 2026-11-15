@@ -18,7 +18,7 @@
 
 <br />
 
-AroNexa is a clickable healthcare prototype with two connected sides: a workspace for doctors and an app for their patients. Records are organised around an interactive body map, so a doctor can click an organ, see its reports, and explain the results in English or Malayalam.
+AroNexa is a clickable healthcare prototype. At its heart are two connected sides: a workspace for doctors and an app for their patients. Records are organised around an interactive body map, so a doctor can click an organ, see its reports, and explain the results in English or Malayalam. Around them sit portals for pharmacies, clinics, labs, delivery riders, the AroNexa team and partners.
 
 <img src="docs/readme/highlights.svg" alt="Highlights: body map, scan comparison, explanations in English and Malayalam, and a live queue." width="100%" />
 
@@ -124,7 +124,9 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and click **Sign in**, as the details are already filled in. To see the other side, choose the **Patient** tab first. Each side offers a short, skippable tour on your first visit.
+Open [http://localhost:3000](http://localhost:3000) and click **Sign in**, as the details are already filled in. To see the other side, choose the **Patient** tab first. The other portals open at their own address, listed under [Other areas](#other-areas).
+
+The first time you sign in on a side, a short narrated guide video plays. You can skip it, and the **Guide video** button at the bottom left plays it again at any time.
 
 | Command | What it does |
 | --- | --- |
@@ -144,31 +146,34 @@ flowchart LR
     D["Session state<br/>Zustand"] <--> C
     B --> E["Doctor app<br/>/doctor"]
     B --> F["Patient app<br/>/patient"]
+    B --> G["Other portals<br/>/pharmacy, /clinic, /lab ..."]
     E <-. "syncs across tabs" .-> F
 ```
 
 | Path | What it holds |
 | --- | --- |
-| `src/app/` | Pages and routes for `/doctor` and `/patient` |
+| `src/app/` | Pages and routes for `/doctor`, `/patient` and each portal |
 | `src/design/DesignApp.tsx` | The app shell: current screen, pop-ups and transitions |
 | `src/design/Node.tsx` | Draws one layer of a screen as HTML |
 | `src/design/store.ts` | Navigation, pop-ups, typed values and control states |
-| `src/design/live/` | Forms, filters, the calendar, downloads, billing and the tour |
+| `src/design/live/` | Forms, filters, the calendar, downloads, billing and the guide videos |
 | `public/design/` | Screen data, images and vector graphics |
-| `public/video/` | ECG explainer videos in English and Malayalam |
+| `public/video/` | ECG explainer videos and the guide videos for each side, with captions |
 
 ## Other areas
 
 Besides `/doctor` and `/patient`, these parts of the product open at their own address. Each starts at its sign-in page.
 
-| Address | Who it's for |
-| --- | --- |
-| `/pharmacy` | Pharmacy staff: requests, quotes, substitutes, orders, deliveries, counter billing, stock, dealers and reports |
-| `/clinic` | Reception (live queue, walk-ins, appointments) and the clinic admin |
-| `/lab` | Lab staff and the pathologist |
-| `/rider` | Delivery riders (a phone-sized app) |
-| `/team` | The AroNexa platform and support teams |
-| `/partner` | Insurers, medicine dealers and sellers |
+| Address | Who it's for | Guide video |
+| --- | --- | --- |
+| `/pharmacy` | Pharmacy staff: requests, quotes, substitutes, orders, deliveries, counter billing, stock, dealers and reports | English and Malayalam |
+| `/clinic` | Reception (live queue, walk-ins, appointments) and the clinic admin | English and Malayalam |
+| `/lab` | Lab staff and the pathologist | English and Malayalam |
+| `/rider` | Delivery riders (a phone-sized app) | Not yet |
+| `/team` | The AroNexa platform and support teams | Not yet |
+| `/partner` | Insurers, medicine dealers and sellers | Not yet |
+
+The doctor's guide video is in English, and the patient's is in English and Malayalam. Each video has captions, and the language switch sits under the video.
 
 New frames from Figma are added with the tools in `scripts/figma-export`.
 
@@ -177,4 +182,5 @@ New frames from Figma are added with the tools in `scripts/figma-export`.
 - **Sample date:** "today" is always Thursday, 15 May 2025, to match the sample data.
 - **Saved changes:** anything you change lasts until the browser tab closes.
 - **Simulated actions:** messages, calls, lab orders and council checks don't reach anyone.
-- **Screen size:** it's designed for computers, and phone layouts aren't included.
+- **Pages still being designed:** a few clinic and lab buttons lead to pages that aren't designed yet. They show a short "isn't ready yet" note and keep you where you are.
+- **Screen size:** it's designed for computers, and phone layouts aren't included. The rider app is the exception, shown at phone size.
