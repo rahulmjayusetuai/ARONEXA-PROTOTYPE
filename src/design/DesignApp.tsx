@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Guide } from "./live/Guide";
+import { Guide, type GuideArea } from "./live/Guide";
 import { LiveModals } from "./live/Modals";
 import { playLeave, softenContent } from "./live/motion";
 import { restoreLive, useLive } from "./live/state";
@@ -22,6 +22,8 @@ function useZoom() {
   }, []);
   return zoom;
 }
+
+const GUIDED: GuideArea[] = ["doctor", "patient", "pharmacy", "clinic", "lab"];
 
 function screenFromPath(path: string) {
   const [area, slug] = path.split("/").filter(Boolean);
@@ -169,6 +171,9 @@ export function DesignApp({ path }: { path: string }) {
   // The rider app is a phone design, so it keeps its own size instead of filling a wide window.
   const zoom = size && size.w < 600 ? Math.min(1, (fullZoom * 1440) / size.w) : fullZoom;
   if (!pageDoc || !size) return <div className="fg-loading">Loading…</div>;
+  const area = screensById.get(screen)?.module ?? "doctor";
+  // Rider, team and partner have no guide video yet.
+  const guideArea = GUIDED.includes(area as GuideArea) ? (area as GuideArea) : null;
 
   return (
     <>
@@ -187,10 +192,12 @@ export function DesignApp({ path }: { path: string }) {
         <OverlayView key={o.key} overlay={o} zoom={zoom} />
       ))}
       <LiveModals />
-      {(!screensById.get(screen)?.module || screensById.get(screen)?.module === "patient") && <Guide
-        area={screensById.get(screen)?.module === "patient" ? "patient" : "doctor"}
-        entered={!/^(Login|Register|Patient sign up)/.test(screensById.get(screen)?.name ?? "")}
-      />}
+      {guideArea && (
+        <Guide
+          area={guideArea}
+          entered={!/^(Login|Register|Patient sign up|Pharmacy register)/.test(screensById.get(screen)?.name ?? "")}
+        />
+      )}
       {notice && <div className="fg-notice" role="status">{notice}</div>}
     </>
   );

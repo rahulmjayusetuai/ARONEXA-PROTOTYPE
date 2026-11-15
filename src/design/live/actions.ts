@@ -199,11 +199,34 @@ function checkStep(ctx: ActionContext) {
 const TABLE_REPORT = /Download (all|timeline|statement)/;
 
 // Runs the real behaviour behind a design action. Returns true when the action should go no further.
+// Some clinic and lab buttons still point at pharmacy pages while their own designs are unfinished.
+// Send them to the matching clinic or lab page when one exists, and say so plainly when it doesn't.
+const OWN_PAGES = /^(Reception web|ClinicAdmin web|Lab web|Pathologist web) \//;
+
+function keepInArea(act: Action, ctx: ActionContext): boolean {
+  if (act.k !== "nav" && act.k !== "ov" && act.k !== "swap") return false;
+  const here = screensById.get(useDesign.getState().screen);
+  const there = screensById.get(act.to);
+  if (!here || !there || (here.module !== "clinic" && here.module !== "lab") || there.module !== "pharmacy") return false;
+  // Sign-in pages link to the other portals on purpose.
+  const prefix = OWN_PAGES.exec(here.name)?.[1];
+  if (!prefix) return false;
+  const label = (ctx.node?.n ?? "").split(" / ").pop()?.trim() ?? "";
+  const own = label ? manifest.screens.find((s) => s.module === here.module && s.name === `${prefix} / ${label}`) : undefined;
+  if (own && act.k === "nav") {
+    act.to = own.id;
+    return false;
+  }
+  say(`${label || "This"} isn’t ready in the ${here.module} portal yet.`);
+  return true;
+}
+
 export function intercept(act: Action, ctx: ActionContext): boolean {
   if (act.k === "fx") {
     runFx(act.fx, act.arg, ctx);
     return true;
   }
+  if (keepInArea(act, ctx)) return true;
   if (act.k === "close" && collectText(ctx.node).join("") === "Message") say("Your question was sent to the clinic’s WhatsApp desk.");
   if (act.k === "nav" && checkStep(ctx)) return true;
   if (act.k === "nav" && !screensById.has(act.to) && !manifest.nodes.includes(act.to)) {

@@ -69,7 +69,7 @@ function reword(n: DesignNode) {
 export function wire(doc: DesignNode, screenName: string) {
   reword(doc);
   // Patient screens have their own controls, which share labels with the doctor's. See patient.ts.
-    // The other areas are wired by their own prototype links only.
+  // The other areas are wired by their own prototype links only.
   if (/^(Patient web|PModal|PToast|Patient sign up|Login · (Patient|Pharmacy|Clinic staff|Lab|AroNexa team|Insurer|Dealer|Seller)|Pharmacy (web|register)|Ph(Modal|Toast)|Reception web|Rc(Modal|Toast)|ClinicAdmin web|Ca(Modal|Toast)|Lab web|Lb(Modal|Toast)|Pathologist web|Pa(Modal|Toast)|Rider|Platform web|Pl(Modal|Toast)|Support web|Sp(Modal|Toast)|(Insurer|Dealer|Seller) web|(In|Dl|Sl)(Modal|Toast))/.test(screenName)) return doc;
   let reviewEdit = 0;
   const walk = (n: DesignNode, parent?: DesignNode, inClick = false) => {
