@@ -79,9 +79,13 @@ body {
   z-index: 100;
 }
 
-/* Tall enough for the longest step, so the buttons stay put from step to step. */
+.lv-guide .lv-dialog {
+  width: min(880px, 100%);
+}
+
 .lv-guide .lv-dialog-body {
-  min-height: 268px;
+  padding: 0;
+  background: #000;
 }
 
 .lv-guide .lv-dialog-foot {
@@ -92,23 +96,37 @@ body {
   margin-right: auto;
 }
 
-.lv-guide-step {
-  font-size: 15px;
-  line-height: 1.5;
-  animation: fg-fade 0.24s ease-out;
+.lv-guide-lang {
+  margin-right: auto;
 }
 
-.lv-guide-step p {
-  margin: 0 0 12px;
+.lv-guide-open {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--lv-navy);
+  color: #fff;
+  font: 600 14px var(--font-manrope), sans-serif;
+  box-shadow: 0 8px 24px rgba(3, 28, 84, 0.3);
+  cursor: pointer;
 }
 
-.lv-guide-step ul {
-  margin: 0;
-  padding-left: 20px;
+.lv-guide-open:hover {
+  filter: brightness(1.15);
 }
 
-.lv-guide-step li + li {
-  margin-top: 10px;
+.lv-guide-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
 }
 
 /* The calendar panel eases in and out by itself while the page behind it cross-fades. */
@@ -363,8 +381,7 @@ button:not(.fg-field):active {
   html .lv-dialog,
   html .lv-pop,
   html .lv-grid-days,
-  html .lv-months,
-  html .lv-guide-step {
+  html .lv-months {
     animation: none;
   }
 
