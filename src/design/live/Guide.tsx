@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Dialog } from "./Modals";
 import { playLeave } from "./motion";
 
-export type GuideArea = "doctor" | "patient" | "pharmacy" | "clinic" | "lab";
+export type GuideArea = "doctor" | "patient" | "pharmacy" | "clinic" | "lab" | "insurer" | "dealer" | "seller";
 type Area = GuideArea;
 
 const VIDEO: Record<Area, { title: string; sub: string }> = {
@@ -13,6 +13,9 @@ const VIDEO: Record<Area, { title: string; sub: string }> = {
   pharmacy: { title: "Welcome to AroNexa for pharmacies", sub: "A one-minute look around" },
   clinic: { title: "Welcome to AroNexa for clinics", sub: "A one-minute look at reception and the clinic admin" },
   lab: { title: "Welcome to AroNexa for labs", sub: "A one-minute look at the lab and the pathologist’s side" },
+  insurer: { title: "Welcome to AroNexa for insurers", sub: "A one-minute look at claims and the fraud desk" },
+  dealer: { title: "Welcome to AroNexa for dealers", sub: "A short look at quotes, orders, catalogue and returns" },
+  seller: { title: "Welcome to AroNexa for Health Store sellers", sub: "A short look at orders, listings and performance" },
 };
 
 const SHOW_AFTER_MS = 600;

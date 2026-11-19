@@ -208,6 +208,27 @@ const OWN_PAGES = /^(Reception web|ClinicAdmin web|Lab web|Pathologist web|Platf
 
 const PORTAL_POPUPS: Record<string, string> = { "Reception web": "RcModal", "ClinicAdmin web": "CaModal", "Lab web": "LbModal", "Pathologist web": "PaModal" };
 
+type BarText = string | ((shown: string) => string);
+const PARTNER_BAR: Record<string, Partial<Record<"branch" | "duty" | "bell", BarText>>> = {
+  "Insurer web": {
+    branch: "Medicare Shield Insurance, Kochi hub. This is your only hub on AroNexa.",
+    duty: (shown) => /Claims lead/.test(shown)
+      ? "Priya Menon leads claims today. Your outcome on a flagged case goes back to her."
+      : "Arvind Nair is on the fraud desk today. Claims with an unusual pattern go to him.",
+    bell: "3 new: claim CL-3318 from Thanal Heart Clinic, a reply on CL-3315, and CL-3312 flagged for review.",
+  },
+  "Dealer web": {
+    branch: "Kerala MediSupply, Kochi. One warehouse is linked to AroNexa.",
+    duty: "Your drug licence is verified and valid to March 2026. We’ll remind you 60 days before it ends.",
+    bell: "2 new: RFQ-571 from Periyar Medicals, and return RET-221 to check.",
+  },
+  "Seller web": {
+    branch: "Greenleaf Wellness, Health Store seller.",
+    duty: "Your business type is Manufacturer. You can see your licence in your profile.",
+    bell: "3 new: orders HS-4410 and HS-4409, and a return request on HS-4395.",
+  },
+};
+
 function keepInArea(act: Action, ctx: ActionContext): boolean {
   if (act.k !== "nav" && act.k !== "ov" && act.k !== "swap") return false;
   const here = screensById.get(useDesign.getState().screen);
@@ -240,6 +261,13 @@ function keepInArea(act: Action, ctx: ActionContext): boolean {
       act.to = own.id;
       return false;
     }
+  }
+  // The partner portals have no pop-ups of their own for the top bar, so these say what the pop-up would show.
+  const bar = { "PhModal / Switch branch": "branch", "PhModal / Pharmacist on duty": "duty", "PhModal / Notifications": "bell" }[there.name] as "branch" | "duty" | "bell" | undefined;
+  const barText = bar && PARTNER_BAR[prefix]?.[bar];
+  if (barText) {
+    say(typeof barText === "string" ? barText : barText(collectText(ctx.node).join(" ")));
+    return true;
   }
   if (there.module !== "pharmacy") return false;
   const label = (ctx.node?.n ?? "").split(" / ").pop()?.trim() ?? "";
