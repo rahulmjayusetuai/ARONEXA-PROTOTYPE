@@ -1396,3 +1396,97 @@ textarea.lv-input {
   flex: 1;
   accent-color: var(--lv-teal);
 }
+
+.lv-reel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #031c54;
+  font-family: var(--font-manrope, Manrope), sans-serif;
+}
+
+.lv-reel video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+}
+
+.lv-reel-tag,
+.lv-reel-time {
+  position: absolute;
+  top: 18px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+  pointer-events: none;
+}
+
+.lv-reel-tag {
+  left: 18px;
+  background: #fff;
+  color: #031c54;
+}
+
+.lv-reel-time {
+  right: 18px;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.lv-reel-play {
+  position: absolute;
+  left: 50%;
+  top: 294px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lv-reel-play:focus-visible,
+.lv-reel-bar:focus-visible {
+  outline: 2px solid #c7ffeb;
+  outline-offset: 2px;
+}
+
+.lv-reel-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 14px;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+}
+
+.lv-reel-bar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.lv-reel-bar i {
+  position: relative;
+  display: block;
+  height: 4px;
+  background: #fff;
+}

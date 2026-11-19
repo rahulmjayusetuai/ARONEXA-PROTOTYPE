@@ -246,6 +246,90 @@ function VideoPlayer({ props, w, h }: { props: Record<string, unknown>; w: numbe
   );
 }
 
+// A Health hub video. It plays while it's on screen and pauses when the patient scrolls past it, like a reel.
+function ReelPlayer({ props, w, h }: { props: Record<string, unknown>; w: number; h: number }) {
+  const box = useRef<HTMLDivElement>(null);
+  const video = useRef<HTMLVideoElement>(null);
+  const [at, setAt] = useState(0);
+  const [length, setLength] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [ended, setEnded] = useState(false);
+  useEffect(() => {
+    const v = video.current;
+    const el = box.current;
+    if (!v || !el) return;
+    // The video the patient opened starts by itself, and each one below starts once it's scrolled into view.
+    let opening = true;
+    const watch = new IntersectionObserver(([e]) => {
+      if (e.intersectionRatio >= 0.6) {
+        if ((props.first || !opening) && v.paused && !v.ended) void v.play().catch(() => undefined);
+      } else if (!v.paused) v.pause();
+      opening = false;
+    }, { threshold: [0, 0.6] });
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [props.first]);
+  const toggle = () => {
+    const v = video.current;
+    if (!v) return;
+    if (v.paused) void v.play().catch(() => undefined);
+    else v.pause();
+  };
+  const left = Math.max(0, Math.ceil((length || 0) - at));
+  return (
+    <div ref={box} className="lv-reel" style={{ width: w, height: h }}>
+      <video
+        ref={video}
+        src={props.src as string}
+        poster={props.poster as string}
+        preload="metadata"
+        playsInline
+        aria-label={`Video: ${props.title as string}`}
+        onClick={toggle}
+        onPlay={() => { setPlaying(true); setEnded(false); }}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setEnded(true)}
+        onTimeUpdate={(e) => setAt(e.currentTarget.currentTime)}
+        onLoadedMetadata={(e) => setLength(e.currentTarget.duration)}
+      >
+        <track kind="captions" src={props.captions as string} srcLang="en" label="English" />
+      </video>
+      {props.tag ? <span className="lv-reel-tag">{props.tag as string}</span> : null}
+      {length ? <span className="lv-reel-time">{playing || at ? clock(left) : clock(length)}</span> : null}
+      {!playing && (
+        <button type="button" className="lv-reel-play" aria-label={ended ? "Play again" : "Play"} onClick={toggle}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a small design icon, like the rest of the screens */}
+          {props.play ? <img src={`/design/vectors/${props.play as string}.svg`} alt="" width={88} height={88} /> : "▶"}
+          {ended && <span>Play again</span>}
+        </button>
+      )}
+      <div
+        className="lv-reel-bar"
+        role="slider"
+        tabIndex={0}
+        aria-label="Video position"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(length)}
+        aria-valuenow={Math.round(at)}
+        onClick={(e) => {
+          const v = video.current;
+          if (!v || !length) return;
+          const r = e.currentTarget.getBoundingClientRect();
+          v.currentTime = ((e.clientX - r.left) / r.width) * length;
+        }}
+        onKeyDown={(e) => {
+          const v = video.current;
+          if (!v) return;
+          if (e.key === "ArrowRight") v.currentTime = Math.min(length, v.currentTime + 5);
+          if (e.key === "ArrowLeft") v.currentTime = Math.max(0, v.currentTime - 5);
+        }}
+      >
+        <i style={{ width: `${length ? (at / length) * 100 : 0}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function LiveWidget({ node, style }: { node: DesignNode; style: CSSProperties }) {
   const props = node.props ?? {};
   const body = (() => {
@@ -264,6 +348,8 @@ export function LiveWidget({ node, style }: { node: DesignNode; style: CSSProper
         return <Player props={props} w={node.w} />;
       case "video":
         return <VideoPlayer props={props} w={node.w} h={node.h} />;
+      case "reel":
+        return <ReelPlayer props={props} w={node.w} h={node.h} />;
       default:
         return null;
     }

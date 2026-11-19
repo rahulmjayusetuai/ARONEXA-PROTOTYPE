@@ -662,6 +662,13 @@ const REELS = [
   "Patient web / Health hub · reels viewer 4 (starts: Taking BP tablets the right way)",
 ];
 const REEL_TITLES = ["5-minute walk to lower your BP", "How much salt is too much?", "Slow breathing: 2 minutes for BP", "Taking BP tablets the right way"];
+// The four videos from the patient's doctor, with their real lengths. The design's lengths were placeholders.
+const REEL_VIDEOS: Record<string, { file: string; was: string; length: string }> = {
+  "5-minute walk to lower your BP": { file: "walk", was: "0:48", length: "0:46" },
+  "How much salt is too much?": { file: "salt", was: "0:52", length: "0:48" },
+  "Slow breathing: 2 minutes for BP": { file: "breathing", was: "1:05", length: "1:09" },
+  "Taking BP tablets the right way": { file: "tablets", was: "0:40", length: "0:34" },
+};
 const HUB_SORTS = ["Most viewed", "Shortest first"];
 const BOOK_FROM_HUB = "Patient web / Book appointment · from Health Hub";
 const CART = "Patient web / Health store · Cart";
@@ -710,6 +717,12 @@ function healthScreens(root: DesignNode, name: string, live: Live) {
     const add = find(row, (n) => n.n === "Button / Add");
     set(add, goTo(CART));
     set(row, /BP monitor/.test(words(row)) ? goTo("Patient web / Health store · Digital BP monitor") : goTo("Patient web / Health store"));
+  });
+  reelVideos(all);
+  // Only the four videos from the patient's doctor have been made; the other cards say so instead of doing nothing.
+  all.filter((n) => n.cid === "832:15188" && !n.a).forEach((card) => {
+    const title = [...texts(card)].sort((a, b) => (b.tx!.s ?? 0) - (a.tx!.s ?? 0))[0]?.tx!.v;
+    card.a = click("say", `“${title}” is coming soon. For now, watch the videos from your doctor.`);
   });
   hubSort(all, live);
   hubFilter(root, all, live);
@@ -870,6 +883,33 @@ function hubFilter(root: DesignNode, all: DesignNode[], live: Live) {
     if (heading) setWords(heading, `No ${kind}videos for ${topic === "For you" || topic === "All topics" ? "you" : topic} yet`);
     const sub = texts(first)[1];
     if (sub) setWords(sub, "Try another topic or type.");
+  }
+}
+
+// Each of the doctor's video cards plays its real video, and every card and list shows its real length.
+function reelVideos(all: DesignNode[]) {
+  const titleIn = (n: DesignNode) => Object.keys(REEL_VIDEOS).find((t) => texts(n).some((x) => x.tx?.v === t));
+  let first = true;
+  for (const n of all) {
+    if (n.t === "T" || !n.ch) continue;
+    const title = titleIn(n);
+    if (!title) continue;
+    const video = REEL_VIDEOS[title];
+    const isCard = n.cid === "832:15188" || n.n?.startsWith("Next / ");
+    if (isCard) {
+      texts(n).forEach((t) => {
+        if (t.tx && t.tx.v.endsWith(video.was)) setWords(t, t.tx.v.slice(0, -video.was.length) + video.length);
+      });
+    }
+    if (n.n === "Video" && n.p?.some((p) => p.k === "i")) {
+      const tag = find(n, (c) => c.n === "Tag");
+      const play = find(n, (c) => c.n === "Play");
+      n.ch = [{
+        id: `${n.id}:reel`, t: "F", x: 0, y: 0, w: n.w, h: n.h, live: "reel",
+        props: { src: `/video/reel-${video.file}.mp4`, poster: `/video/reel-${video.file}.jpg`, captions: `/video/reel-${video.file}.vtt`, title, tag: tag ? words(tag).trim() : "", play: play?.g, first },
+      }];
+      first = false;
+    }
   }
 }
 
