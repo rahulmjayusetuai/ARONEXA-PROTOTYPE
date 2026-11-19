@@ -1415,8 +1415,6 @@ textarea.lv-input {
 
 .lv-reel-tag,
 .lv-reel-time {
-  position: absolute;
-  top: 18px;
   padding: 7px 14px;
   border-radius: 999px;
   font-size: 13px;
@@ -1426,13 +1424,58 @@ textarea.lv-input {
 }
 
 .lv-reel-tag {
+  position: absolute;
+  top: 18px;
   left: 18px;
   background: #fff;
   color: #031c54;
 }
 
-.lv-reel-time {
+.lv-reel-side {
+  position: absolute;
+  top: 18px;
   right: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.lv-reel-lang {
+  display: flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.lv-reel-lang button {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.lv-reel-lang button[lang="ml"] {
+  font-family: var(--font-noto-malayalam, "Noto Sans Malayalam"), sans-serif;
+}
+
+.lv-reel-lang button.on {
+  background: #fff;
+  color: #031c54;
+}
+
+.lv-reel-lang button:focus-visible {
+  outline: 2px solid #c7ffeb;
+  outline-offset: 1px;
+}
+
+.lv-reel-time {
   background: rgba(0, 0, 0, 0.4);
   color: #fff;
   font-variant-numeric: tabular-nums;

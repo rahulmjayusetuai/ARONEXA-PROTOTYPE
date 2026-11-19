@@ -544,7 +544,7 @@ function ReelModal({ title, doctor, role, tag, topic, file, close }: Reel & { cl
       <button type="button" className="lv-btn lv-btn-dark" onClick={askDoctor}>Ask a doctor</button>
     </>}>
       <div className="lv-reel-modal-body">
-        <ReelPlayer props={{ src: `/video/reel-${file}.mp4`, poster: `/video/reel-${file}.jpg`, captions: `/video/reel-${file}.vtt`, title, tag, first: true }} w={320} h={547} />
+        <ReelPlayer props={{ src: `/video/reel-${file}.mp4`, title, tag, first: true }} w={320} h={547} />
         <div className="lv-reel-modal-info">
           <p className="lv-reel-modal-doc">✓ {doctor}</p>
           <p className="lv-help">{role}</p>

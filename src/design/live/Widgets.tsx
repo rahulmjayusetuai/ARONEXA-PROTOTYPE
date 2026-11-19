@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { runActions, useDesign } from "../store";
 import type { DesignNode } from "../types";
 import { CalendarPanel } from "./Calendar";
@@ -246,14 +246,52 @@ function VideoPlayer({ props, w, h }: { props: Record<string, unknown>; w: numbe
   );
 }
 
+// The patient's video language, shared by every Health hub video and kept for their next visit.
+type ReelLang = "en" | "ml";
+const LANG_KEY = "aronexa-reel-lang";
+const LANG_EVENT = "aronexa-reel-lang";
+let chosenLang: ReelLang | null = null;
+function readLang(): ReelLang {
+  if (chosenLang) return chosenLang;
+  try {
+    return localStorage.getItem(LANG_KEY) === "ml" ? "ml" : "en";
+  } catch {
+    return "en";
+  }
+}
+function useReelLang(): [ReelLang, (l: ReelLang) => void] {
+  const lang = useSyncExternalStore(
+    (changed) => {
+      window.addEventListener(LANG_EVENT, changed);
+      return () => window.removeEventListener(LANG_EVENT, changed);
+    },
+    readLang,
+    () => "en" as ReelLang,
+  );
+  const choose = (l: ReelLang) => {
+    chosenLang = l;
+    try {
+      localStorage.setItem(LANG_KEY, l);
+    } catch {
+      // Private windows can refuse storage; the choice still applies on this page.
+    }
+    window.dispatchEvent(new Event(LANG_EVENT));
+  };
+  return [lang, choose];
+}
+
 // A Health hub video. It plays while it's on screen and pauses when the patient scrolls past it, like a reel.
 export function ReelPlayer({ props, w, h }: { props: Record<string, unknown>; w: number; h: number }) {
   const box = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
+  const resume = useRef(false);
   const [at, setAt] = useState(0);
   const [length, setLength] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
+  const [lang, setLang] = useReelLang();
+  const base = (props.src as string).replace(/\.mp4$/, "");
+  const file = lang === "ml" ? `${base}-ml` : base;
   useEffect(() => {
     const v = video.current;
     const el = box.current;
@@ -275,27 +313,51 @@ export function ReelPlayer({ props, w, h }: { props: Record<string, unknown>; w:
     if (v.paused) void v.play().catch(() => undefined);
     else v.pause();
   };
+  const switchTo = (l: ReelLang) => {
+    if (l === lang) return;
+    // A video that was playing carries on in the new language, from the start.
+    resume.current = Boolean(video.current && !video.current.paused);
+    setAt(0);
+    setEnded(false);
+    setLang(l);
+  };
   const left = Math.max(0, Math.ceil((length || 0) - at));
   return (
     <div ref={box} className="lv-reel" style={{ width: w, height: h }}>
       <video
         ref={video}
-        src={props.src as string}
-        poster={props.poster as string}
+        src={`${file}.mp4`}
+        poster={`${file}.jpg`}
         preload="metadata"
         playsInline
+        lang={lang}
         aria-label={`Video: ${props.title as string}`}
         onClick={toggle}
         onPlay={() => { setPlaying(true); setEnded(false); }}
         onPause={() => setPlaying(false)}
         onEnded={() => setEnded(true)}
         onTimeUpdate={(e) => setAt(e.currentTarget.currentTime)}
-        onLoadedMetadata={(e) => setLength(e.currentTarget.duration)}
+        onLoadedMetadata={(e) => {
+          setLength(e.currentTarget.duration);
+          if (resume.current) {
+            resume.current = false;
+            void e.currentTarget.play().catch(() => undefined);
+          }
+        }}
       >
-        <track kind="captions" src={props.captions as string} srcLang="en" label="English" />
+        <track kind="captions" src={`${file}.vtt`} srcLang={lang} label={lang === "ml" ? "മലയാളം" : "English"} />
       </video>
       {props.tag ? <span className="lv-reel-tag">{props.tag as string}</span> : null}
-      {length ? <span className="lv-reel-time">{playing || at ? clock(left) : clock(Math.round(length))}</span> : null}
+      <div className="lv-reel-side">
+        {length ? <span className="lv-reel-time">{playing || at ? clock(left) : clock(Math.round(length))}</span> : null}
+        <div className="lv-reel-lang" role="group" aria-label="Video language">
+          {(["en", "ml"] as const).map((code) => (
+            <button key={code} type="button" lang={code} aria-pressed={lang === code} className={lang === code ? "on" : undefined} onClick={() => switchTo(code)}>
+              {code === "en" ? "English" : "മലയാളം"}
+            </button>
+          ))}
+        </div>
+      </div>
       {!playing && (
         <button type="button" className="lv-reel-play" aria-label={ended ? "Play again" : "Play"} onClick={toggle}>
           {/* eslint-disable-next-line @next/next/no-img-element -- a small design icon, like the rest of the screens */}

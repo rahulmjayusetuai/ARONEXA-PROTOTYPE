@@ -923,7 +923,7 @@ function reelVideos(all: DesignNode[]) {
       const play = find(n, (c) => c.n === "Play");
       n.ch = [{
         id: `${n.id}:reel`, t: "F", x: 0, y: 0, w: n.w, h: n.h, live: "reel",
-        props: { src: `/video/reel-${video.file}.mp4`, poster: `/video/reel-${video.file}.jpg`, captions: `/video/reel-${video.file}.vtt`, title, tag: tag ? words(tag).trim() : "", play: play?.g, first },
+        props: { src: `/video/reel-${video.file}.mp4`, title, tag: tag ? words(tag).trim() : "", play: play?.g, first },
       }];
       first = false;
     }
