@@ -182,7 +182,7 @@ function medicines(root: DesignNode, live: Live) {
       tone: "plain",
       title: `${m.name} · ${m.dose}`,
       detail: `${m.often} · ${m.when || "Any time"} · for ${m.length}`,
-      meta: `Sent to ${m.pharmacy} · Dr. Arjun Mehta · 15 May 2025`,
+      meta: `${m.pharmacy ? `Sent to ${m.pharmacy}` : "Prescription issued"} · Dr. Arjun Mehta · 15 May 2025`,
       badge: "New",
     }), 10);
   });
@@ -201,7 +201,7 @@ function orders(root: DesignNode, live: Live, name: string) {
     insertAt(root, root, y, liveRow(`row-${o.id}`, 24, 1392, 92, {
       tone: "plain",
       title: `${o.type || "Test"}: ${o.test}`,
-      detail: `${o.lab} · ${o.urgency || "Routine"}`,
+      detail: [o.lab, o.urgency || "Routine"].filter(Boolean).join(" · "),
       meta: `Do before ${o.before} · Ordered today by Dr. Arjun Mehta`,
       badge: "Ordered, result pending",
     }), 12);
