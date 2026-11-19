@@ -1,7 +1,7 @@
 import type { DesignNode } from "../types";
 import { isPatientScreen, patientDoc } from "./patient";
 import { ALL_PATIENTS, baseAppointments, collectedExtra, TODAY } from "./schedule";
-import { useLive } from "./state";
+import { readQuestions, useLive } from "./state";
 import EXPLAIN_AUDIO from "./explain-audio.json";
 import manifest from "../manifest.json";
 
@@ -283,7 +283,62 @@ function orders(root: DesignNode, live: Live, name: string) {
   });
 }
 
+// "Ask my doctor" questions from the patient's tab show on the Messages card, which then opens them.
+function patientQuestions(root: DesignNode, live: Live) {
+  const questions = readQuestions(live.filters.questions);
+  if (!questions.length) return;
+  const detail = findNode(root, (n) => n.tx?.v === "2 from Thanal lab, 2 from patients");
+  const card = detail && findNode(root, (n) => Boolean(n.ch?.includes(detail)));
+  if (!detail?.tx || !card) return;
+  const value = card.ch?.find((c) => c.n === "Value" && c.tx);
+  if (value?.tx) value.tx = { ...value.tx, v: String(4 + questions.length) };
+  detail.tx = { ...detail.tx, v: `2 from Thanal lab, ${2 + questions.length} from patients` };
+  const unread = questions.filter((q) => !q.read).length;
+  if (unread) {
+    card.ch?.push({
+      id: "questions-new", t: "F", x: card.w - 94, y: 15, w: 76, h: 24, r: 999, p: [{ k: "s", c: "rgb(199,255,235)" }],
+      ch: [{ id: "questions-new:t", t: "T", x: 0, y: 3, w: 76, h: 18, p: [{ k: "s", c: "rgb(6,95,70)" }], tx: { v: `${unread} new`, f: "Manrope", s: 12, w: 700, lh: 18, a: "CENTER", va: "CENTER", r: "NONE" } }],
+    });
+  }
+  card.a = [{ on: "click", acts: [{ k: "fx", fx: "questions" }] }];
+  // The newest question still waiting for a reply also leads "Needs your attention".
+  const waiting = questions.filter((q) => !q.reply);
+  const model = findNode(root, (n) => n.n === "Attention / Substitute");
+  const list = model && findNode(root, (n) => Boolean(n.ch?.includes(model)));
+  if (!waiting.length || !model || !list) return;
+  const next = list.ch?.filter((c) => /^Attention \//.test(c.n ?? "") && c.y > model.y).sort((a, b) => a.y - b.y)[0];
+  const row: DesignNode = JSON.parse(JSON.stringify(model));
+  const rename = (n: DesignNode) => {
+    n.id = `question-row:${n.id}`;
+    n.ch?.forEach(rename);
+  };
+  rename(row);
+  row.n = "Attention / Patient question";
+  row.a = [{ on: "click", acts: [{ k: "fx", fx: "questions" }] }];
+  const about = waiting[0].about.length > 30 ? `${waiting[0].about.slice(0, 29).trim()}…` : waiting[0].about;
+  const set = (name: string, v: string) => {
+    const t = findNode(row, (n) => n.n === name && Boolean(n.tx));
+    if (t?.tx) t.tx = { ...t.tx, v, r: "NONE" };
+    return t;
+  };
+  const title = set("Title", waiting.length > 1 ? `${waiting.length} questions from James` : "James Heatfield asked");
+  if (title) title.w = 205;
+  const what = set("Detail", about || "A question from the patient app");
+  if (what) what.w = 205;
+  const pill = findNode(row, (n) => n.n === "Status pill");
+  const label = pill && findNode(pill, (n) => Boolean(n.tx));
+  if (pill && label?.tx) {
+    pill.p = [{ k: "s", c: "rgb(199,255,235)" }];
+    label.p = [{ k: "s", c: "rgb(6,95,70)" }];
+    label.tx = { ...label.tx, v: "Reply", a: "CENTER", r: "NONE" };
+    label.x = 0;
+    label.w = pill.w;
+  }
+  insertAt(root, list, model.y, row, next ? next.y - model.y - model.h : 8);
+}
+
 function home(root: DesignNode, live: Live) {
+  patientQuestions(root, live);
   const q = (live.filters.home ?? "").trim().toLowerCase();
   const isRow = (n: DesignNode) => n.w >= 900 && n.h >= 45 && n.h <= 100 && /^[TS]-\d\d$/.test(allText(n)[0] ?? "");
   const list = findNode(root, (n) => (n.ch?.filter(isRow).length ?? 0) >= 3);

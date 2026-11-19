@@ -725,6 +725,9 @@ const REEL_VIDEOS: Record<string, { file: string; was: string; length: string }>
   "Taking BP tablets the right way": { file: "tablets", was: "0:40", length: "0:34" },
 };
 // The hub's other videos, which play in a pop-up because the design has no viewer page for them.
+// Titles of every Health hub video, so a question asked beside one can name it.
+export const videoTitles = () => [...Object.keys(REEL_VIDEOS), ...Object.keys(MORE_VIDEOS)];
+
 const MORE_VIDEOS: Record<string, { file: string; was: string; length: string }> = {
   "Does drinking water lower BP?": { file: "water", was: "0:35", length: "0:39" },
   "3 easy exercises for high BP": { file: "exercises", was: "0:58", length: "0:49" },
