@@ -78,7 +78,7 @@ Assign a home collector, handle requests, upload report files, then review and p
 - **Patient record:** overview, timeline, medicines and allergies
 - **Body map:** click an organ to see its reports and tests
 - **Scans and reports:** compare results side by side
-- **Explain to patient:** clear summaries in English and Malayalam
+- **Explain to patient:** clear summaries and a narrated video preview, in English and Malayalam
 - **Clinical notes, labs and documents:** with PDF downloads
 - **Billing:** collect payments, print receipts, export CSV
 
@@ -89,7 +89,8 @@ Assign a home collector, handle requests, upload report files, then review and p
 - **Live queue:** follow your place on the day of a visit
 - **Appointments:** book, move or cancel
 - **My body:** the same body map, in plain language
-- **Reports and scans:** with explanations from your doctor
+- **Reports and scans:** with explanations and narrated videos from your doctor
+- **Health hub:** short narrated videos from doctors, in English and Malayalam
 - **Medicines and lab tests:** all in one place
 - **Bills, records and sharing:** pay, download and share
 - **Family and emergency:** profiles for relatives, help in one click
@@ -97,6 +98,18 @@ Assign a home collector, handle requests, upload report files, then review and p
 </td>
 </tr>
 </table>
+
+### Videos and voices
+
+Every video has English and Malayalam narration, with captions. The switch under each video changes the language.
+
+| Where | What plays |
+| --- | --- |
+| Guide videos | A one-minute narrated tour of the doctor, patient, pharmacy, clinic and lab sides, shown the first time you sign in. **Guide video** at the bottom left plays it again |
+| Patient › Health hub | 12 short videos from doctors on blood pressure, breathing, medicines, potassium and knee recovery. The chosen language carries over to the next video |
+| Doctor › Explain to patient | **▶ Watch preview** plays a narrated explainer for each of 10 reports, with the storyboard timed to the voice |
+| Patient › Reports | The same explainers, as the patient sees them |
+| Patient › Home | **Listen** on an explained report plays the doctor's summary aloud |
 
 <details>
 <summary><b>View more screenshots</b></summary>
@@ -174,9 +187,9 @@ flowchart LR
 | `src/design/DesignApp.tsx` | The app shell: current screen, pop-ups and transitions |
 | `src/design/Node.tsx` | Draws one layer of a screen as HTML |
 | `src/design/store.ts` | Navigation, pop-ups, typed values and control states |
-| `src/design/live/` | Forms, filters, the calendar, downloads, billing and the guide videos |
+| `src/design/live/` | Forms, filters, the calendar, downloads, billing and the video players |
 | `public/design/` | Screen data, images and vector graphics |
-| `public/video/` | ECG explainer videos and the guide videos for each side, with captions |
+| `public/video/` | Guide, Health hub and report explainer videos and narration, in English and Malayalam, with captions |
 
 ## Other areas
 
@@ -191,7 +204,7 @@ Besides `/doctor` and `/patient`, these parts of the product open at their own a
 | `/team` | The AroNexa platform and support teams | Not yet |
 | `/partner` | Insurers, medicine dealers and sellers | Not yet |
 
-The doctor's guide video is in English, and the patient's is in English and Malayalam. Each video has captions, and the language switch sits under the video.
+The doctor's and patient's guide videos are also in English and Malayalam. Each video has captions, and the language switch sits under the video.
 
 New frames from Figma are added with the tools in `scripts/figma-export`.
 
@@ -199,6 +212,7 @@ New frames from Figma are added with the tools in `scripts/figma-export`.
 
 - **Sample date:** "today" is always Thursday, 15 May 2025, to match the sample data.
 - **Saved changes:** anything you change lasts until the browser tab closes.
+- **Health videos:** written as samples for the prototype. They are not medical advice.
 - **Simulated actions:** messages, calls, lab orders and council checks don't reach anyone.
 - **Pages still being designed:** a few clinic and lab buttons lead to pages that aren't designed yet. They show a short "isn't ready yet" note and keep you where you are.
 - **Screen size:** it's designed for computers, and phone layouts aren't included. The rider app is the exception, shown at phone size.
