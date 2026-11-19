@@ -6,6 +6,9 @@ import { exportSource, printBlocks, writeCsv, writePdf, type Block } from "./exp
 import { DateGrid, optionsFor, SelectField } from "./Fields";
 import { baseAppointments, fieldDate, MONTHS, minutes, plainDate, TIME_OPTIONS, TODAY, type Appt } from "./schedule";
 import { newId, useLive } from "./state";
+import { ReelPlayer } from "./Widgets";
+import { runActions, useDesign } from "../store";
+import type { Action } from "../types";
 
 export function Dialog({ title, sub, children, foot, onClose, className }: { title: string; sub?: string; children: ReactNode; foot?: ReactNode; onClose: () => void; className?: string }) {
   return (
@@ -409,10 +412,33 @@ const KNOWN_HFR: Record<string, string> = {
   IN3210067890: "Sahya Heart Care, NH 66, Edappally",
 };
 
+// "Ask my doctor": the patient writes the question, then the design's "Question sent" message shows.
+function AskDoctor({ about, close }: { about: string; close: () => void }) {
+  const [text, setText] = useState("");
+  const [error, setError] = useState(false);
+  const send = () => {
+    if (!text.trim()) return setError(true);
+    close();
+    toast("PToast / ask");
+  };
+  return (
+    <Dialog title="Ask my doctor" sub={`Dr. Arjun Mehta · Thanal Heart Clinic${about ? ` · about ${about.replace(/^My body · /, "your ")}` : ""}`} onClose={close} foot={<>
+      <button type="button" className="lv-btn" onClick={close}>Cancel</button>
+      <button type="button" className="lv-btn lv-btn-dark" onClick={send}>Send question</button>
+    </>}>
+      <label className="lv-label">Your question<textarea autoFocus rows={4} className="lv-input" value={text} placeholder="For example: is it safe to keep walking every day?" onChange={(e) => { setText(e.target.value); setError(false); }} /></label>
+      {error && <p className="lv-error" role="alert">Write your question first.</p>}
+      <p className="lv-help">Your doctor sees your records with it. For anything urgent, use Emergency.</p>
+    </Dialog>
+  );
+}
+
 function FindClinic({ close }: { close: () => void }) {
   const setFilter = useLive((s) => s.setFilter);
   const clinics = useLive((s) => s.filters.clinics);
-  const [hfr, setHfr] = useState("IN3210045678");
+  // Starts from what the doctor typed in the page's HFR ID box, if anything.
+  const typed = useDesign((s) => s.values["256:6134"]);
+  const [hfr, setHfr] = useState(typed?.trim() || "IN3210045678");
   const [result, setResult] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const find = () => {
@@ -527,6 +553,32 @@ function Attach({ close }: { close: () => void }) {
   );
 }
 
+type Reel = { title: string; doctor: string; role: string; tag: string; topic: string; file: string };
+
+// A Health hub video with no viewer page of its own, played in a pop-up.
+function ReelModal({ title, doctor, role, tag, topic, file, close }: Reel & { close: () => void }) {
+  const askDoctor = () => {
+    close();
+    runActions([{ k: "fx", fx: "goto", arg: "Patient web / Book appointment · from Health Hub" } as Action], []);
+  };
+  return (
+    <Dialog title={title} sub={`${doctor} · ${role.replace(/ · .*$/, "")}`} onClose={close} className="lv-reel-modal" foot={<>
+      <button type="button" className="lv-btn" onClick={() => say("Saved to your videos.")}>Save</button>
+      <button type="button" className="lv-btn lv-btn-dark" onClick={askDoctor}>Ask a doctor</button>
+    </>}>
+      <div className="lv-reel-modal-body">
+        <ReelPlayer props={{ src: `/video/reel-${file}.mp4`, title, tag, first: true }} w={320} h={547} />
+        <div className="lv-reel-modal-info">
+          <p className="lv-reel-modal-doc">✓ {doctor}</p>
+          <p className="lv-help">{role}</p>
+          <div className="lv-reel-modal-tags">{[tag, topic].filter(Boolean).map((t) => <span key={t}>{t}</span>)}</div>
+          <p className="lv-help">Educational content · Not a substitute for a consultation. Talk to your doctor before changing your treatment.</p>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
 export function LiveModals() {
   const modal = useLive((s) => s.modal);
   const close = useLive((s) => s.closeModal);
@@ -568,6 +620,8 @@ export function LiveModals() {
       return <Selfie close={close} />;
     case "findClinic":
       return <FindClinic close={close} />;
+    case "ask":
+      return <AskDoctor about={String((p as { about?: string }).about ?? "")} close={close} />;
     case "pin":
       return <ValueEditor title="Move pin" label="Latitude, longitude" value="10.1076, 76.3516" rule="pin" close={close} />;
     case "value":
@@ -578,6 +632,8 @@ export function LiveModals() {
       return <Confirm {...(p as { title: string })} close={close} />;
     case "attach":
       return <Attach close={close} />;
+    case "reel":
+      return <ReelModal {...(p as Reel)} close={close} />;
     default:
       return null;
   }

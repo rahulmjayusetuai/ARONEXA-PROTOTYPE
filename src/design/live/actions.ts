@@ -3,8 +3,8 @@
 import { calendarReturn, goTo, load, loaded, manifest, screensById, useDesign } from "../store";
 import type { Action, DesignNode } from "../types";
 import { blocksFrom, exportSource, printBlocks, writePdf } from "./export";
-import { bookingWhen, slotProblem } from "./patient";
-import { liveDoc } from "./transform";
+import { bookingWhen, readCart, slotProblem, writeCart } from "./patient";
+import { liveDoc, scanOrganOf, TIMELINE_TYPES, timelineScreen } from "./transform";
 import { TODAY } from "./schedule";
 import { newId, useLive } from "./state";
 
@@ -100,9 +100,10 @@ function submitForm(toastName: string, ctx: ActionContext): boolean {
     const added = live.allergies.find((a) => name.toLowerCase().includes(a.substance.toLowerCase().split(" ")[0]));
     if (PENICILLIN_GROUP.test(name)) return say(`Blocked: James is allergic to penicillin. Choose the suggested Azithromycin instead.`), false;
     if (added) return say(`Blocked: James has a recorded allergy to ${added.substance}.`), false;
+    // The prescription is issued to the patient; older layouts also picked a pharmacy.
     const pharmacy = formValue("211:4964", doc);
     live.add("meds", { id: newId(), name, dose: formValue("188:4570", doc), often: formValue("188:4575", doc), length: formValue("188:4580", doc), when: chipValue("189:4724", doc), pharmacy });
-    live.setText("toast:rx", pharmacy.split(",")[0]);
+    if (pharmacy) live.setText("toast:rx", pharmacy.split(",")[0]);
     return true;
   }
   if (toastName === "Toast / upload") {
@@ -178,7 +179,8 @@ function checkStep(ctx: ActionContext) {
   const live = useLive.getState();
   const isForward = /^(Sign in|Continue|Check and submit|Submit for verification|സൈൻ ഇൻ|തുടരുക)/.test(label);
   if (!isForward || !/^(Login|Register)/.test(name)) return false;
-  const cleared = Object.entries(values).some(([id, v]) => !v.trim() && walkFind(doc, (n) => n.id === id));
+  // Optional boxes that only show a hint, like the HFR ID search, may stay empty.
+  const cleared = Object.entries(values).some(([id, v]) => !v.trim() && walkFind(doc, (n) => n.id === id && n.n !== "Placeholder"));
   if (cleared) return say("Fill in the empty fields first."), true;
   if (name.startsWith("Register / 1")) {
     const secrets: DesignNode[] = [];
@@ -199,10 +201,74 @@ function checkStep(ctx: ActionContext) {
 const TABLE_REPORT = /Download (all|timeline|statement)/;
 
 // Runs the real behaviour behind a design action. Returns true when the action should go no further.
+// The clinic, lab, AroNexa team and partner portals reuse the pharmacy's top bar and tabs, whose design links
+// still point at pharmacy pages. Send them to the matching page of their own portal when one exists,
+// and say so plainly when it doesn't.
+const OWN_PAGES = /^(Reception web|ClinicAdmin web|Lab web|Pathologist web|Platform web|Support web|Insurer web|Dealer web|Seller web) \//;
+
+const PORTAL_POPUPS: Record<string, string> = { "Reception web": "RcModal", "ClinicAdmin web": "CaModal", "Lab web": "LbModal", "Pathologist web": "PaModal" };
+
+function keepInArea(act: Action, ctx: ActionContext): boolean {
+  if (act.k !== "nav" && act.k !== "ov" && act.k !== "swap") return false;
+  const here = screensById.get(useDesign.getState().screen);
+  const there = screensById.get(act.to);
+  if (!here || !there || !here.module || here.module === "pharmacy" || here.module === "patient") return false;
+  // Sign-in pages link to the other portals on purpose.
+  const prefix = OWN_PAGES.exec(here.name)?.[1];
+  if (!prefix) return false;
+  // The top bar's pop-ups: each portal has its own profile menu, notifications, branches and staff on duty.
+  const popups = PORTAL_POPUPS[prefix];
+  const nodeName = ctx.node?.n ?? "";
+  const popup = (suffix: string) => (popups ? manifest.screens.find((s) => s.name === `${popups} / ${suffix}`) : undefined);
+  if (/Button \/ Profile$/.test(nodeName) && popup("Profile")) {
+    act.k = "ov";
+    act.to = popup("Profile")!.id;
+    return false;
+  }
+  if (/^PhModal \//.test(there.name) && popups) {
+    const suffix = { "PhModal / Switch branch": "Switch branch", "PhModal / Pharmacist on duty": "On duty", "PhModal / Notifications": "Notifications" }[there.name];
+    // The clinic admin's "Plan active" pill sits where the others show who is on duty.
+    if (suffix === "On duty" && prefix === "ClinicAdmin web") {
+      const plan = manifest.screens.find((s) => s.name === "ClinicAdmin web / Subscription");
+      if (plan) {
+        Object.assign(act, { k: "nav", to: plan.id });
+        return false;
+      }
+    }
+    const own = suffix ? popup(suffix) : undefined;
+    if (own) {
+      act.to = own.id;
+      return false;
+    }
+  }
+  if (there.module !== "pharmacy") return false;
+  const label = (ctx.node?.n ?? "").split(" / ").pop()?.trim() ?? "";
+  const own = label ? manifest.screens.find((s) => s.module === here.module && s.name === `${prefix} / ${label}`) : undefined;
+  if (own && act.k === "nav") {
+    act.to = own.id;
+    return false;
+  }
+  // Name the page only when the button shows that name; a pill like "Plan active" reuses the "On duty" link.
+  const shown = collectText(ctx.node).join(" ").trim();
+  const named = label && shown.toLowerCase().startsWith(label.toLowerCase());
+  say(`${named ? label : "This"} isn’t designed for the ${here.module} portal yet.`);
+  return true;
+}
+
 export function intercept(act: Action, ctx: ActionContext): boolean {
   if (act.k === "fx") {
     runFx(act.fx, act.arg, ctx);
     return true;
+  }
+  if (keepInArea(act, ctx)) return true;
+  if (act.k === "nav" && /^Patient web \/ Book appointment$/.test(screensById.get(act.to)?.name ?? "")) {
+    // Rescheduling moves a booking that is already paid for; a new booking pays the fee.
+    useLive.getState().setFilter("rebook", /Reschedul/i.test(collectText(ctx.node).join(" ")) ? "1" : "");
+  }
+  if (act.k === "nav" && /^Scan detail \//.test(screensById.get(act.to)?.name ?? "")) {
+    // The chest X-ray belongs to both the heart and the lungs, so remember which one the doctor came from.
+    const from = scanOrganOf(screenName(), useLive.getState().filters.scanOrgan);
+    useLive.getState().setFilter("scanOrgan", from ?? "Heart");
   }
   if (act.k === "close" && collectText(ctx.node).join("") === "Message") say("Your question was sent to the clinic’s WhatsApp desk.");
   if (act.k === "nav" && checkStep(ctx)) return true;
@@ -286,8 +352,47 @@ async function downloadAllData() {
 }
 
 let speaking = false;
+let narration: HTMLAudioElement | null = null;
+
+// Cards whose summary has a narrated recording, in the same voice as the explainer videos.
+const NARRATED: [RegExp, string][] = [[/heart tracing \(ECG\)/, "/video/explain-heart-tracing-ecg.mp3"]];
+
+// The recording for the card around a Listen button: the nearest enclosing card that names a narrated report.
+function narrationFor(node?: DesignNode) {
+  const root = screenDoc();
+  if (!node || !root) return undefined;
+  const path: DesignNode[] = [];
+  const walk = (n: DesignNode): boolean => {
+    path.push(n);
+    if (n.id === node.id || n.ch?.some(walk)) return true;
+    path.pop();
+    return false;
+  };
+  if (!walk(root)) return undefined;
+  for (const card of [...path].reverse().slice(0, 4)) {
+    const text = collectText(card).join(" ");
+    const hit = NARRATED.find(([pattern]) => pattern.test(text));
+    if (hit) return hit[1];
+  }
+  return undefined;
+}
 
 function readAloud(ctx: ActionContext) {
+  if (narration && !narration.paused) {
+    narration.pause();
+    narration = null;
+    return say("Stopped reading.");
+  }
+  const recording = narrationFor(ctx.node);
+  if (recording) {
+    narration = new Audio(recording);
+    narration.onended = () => {
+      narration = null;
+    };
+    void narration.play().catch(() => say("Press Listen again to play the summary."));
+    toast("PToast / listen");
+    return;
+  }
   const speech = window.speechSynthesis;
   if (!speech) return say("This browser can’t read aloud.");
   if (speaking) {
@@ -337,6 +442,14 @@ function patientAction(dest: string, ctx: ActionContext): boolean {
     case "PToast / listen":
       readAloud(ctx);
       return true;
+    case "PToast / ask":
+      // The question is written first; the design's "Question sent" message follows.
+      if (ctx.overlay === undefined) {
+        const page = screenName().replace(/^Patient web \/ /, "");
+        live.openModal("ask", { about: page });
+        return true;
+      }
+      return false;
     case "PToast / share":
       void navigator.clipboard?.writeText(`${window.location.origin}/patient/patient-web-records-sharing`).catch(() => undefined);
       return false;
@@ -497,11 +610,97 @@ function dictate() {
   toast("Toast / dictate");
 }
 
+// The Add clinical note form starts from a template for the organ the doctor picks.
+export const NOTE_FIELDS = ["184:4638", "184:4644", "184:4650", "184:4656", "184:4662"];
+const NOTE_TEMPLATES: Record<string, string[]> = {
+  Heart: ["Cardiology follow-up: palpitations", "Palpitations 2–3 times a week, a few seconds each. No chest pain or fainting.", "Heart rate 72, BP 128/78. Heart sounds normal.", "Likely harmless palpitations. ECG today is normal.", "24-hour Holter test on 22 May. Review results on 29 May."],
+  Lungs: ["Lung review: breathing test follow-up", "Mild breathlessness on stairs. No cough or wheeze.", "Chest clear, SpO₂ 98%. Breathing test from January in normal range.", "Lungs healthy. Breathlessness likely from low fitness.", "Walk 30 minutes a day. Review in 3 months if not better."],
+  Brain: ["Headache review", "Headaches 1–2 times a month, worse after poor sleep.", "Nerve checks normal. MRI from March 2024 normal.", "Tension-type headaches.", "Regular sleep, paracetamol when needed. Review if headaches get more frequent."],
+  Liver: ["Liver check: ultrasound follow-up", "No pain. Mild tiredness.", "Abdomen soft, not tender. Liver tests in range.", "Mild fatty liver on ultrasound.", "Less sugar and fried food, more exercise. Repeat liver tests in 6 months."],
+  Stomach: ["Reflux review", "Heartburn after late meals, 2–3 nights a week.", "Abdomen soft, mild upper tenderness. Breath test negative.", "Acid reflux, no infection.", "Omeprazole 20 mg before breakfast for 4 weeks. Eat 3 hours before bed."],
+  Kidneys: ["Kidney check", "No swelling. No change in passing urine.", "BP 128/78. Creatinine and eGFR in range.", "Kidneys working normally.", "Drink 2–3 litres of water a day. Repeat kidney tests in 1 year."],
+  Intestines: ["Bowel review", "Bloating now and then. No blood in stool.", "Abdomen soft, not tender. Stool test normal.", "Mild irritable bowel.", "More fibre and water. Review in 3 months."],
+  Joints: ["Knee review: right knee", "Right knee pain after climbing stairs.", "Mild swelling, full movement. X-ray shows no fracture.", "Knee strain, healing well.", "Physiotherapy twice a week. Review in 4 weeks."],
+  General: ["General review", "Feels well. No new complaints.", "BP 128/78, heart rate 72, temperature 36.7 °C.", "Healthy, no new problems.", "Annual check-up in 1 year."],
+};
+
+// The four starting points in "Note templates" on the clinical notes page.
+const NOTE_STARTERS: Record<string, string[]> = {
+  "Follow-up visit": NOTE_TEMPLATES.Heart,
+  "New problem": ["New problem: ", "History: when it started, how often, what makes it better or worse.", "Examination findings.", "Most likely cause.", "Tests ordered and when to review."],
+  "Result explained": ["Result explained: Resting ECG", "Asked what today’s ECG means.", "ECG normal. Heart rate 72, regular rhythm.", "Explained in simple words that the heart tracing is normal.", "Visit summary sent on WhatsApp. Holter test on 22 May as planned."],
+  Referral: ["Referral: 24-hour Holter test", "Reason: palpitations 2–3 times a week.", "ECG today normal. Symptoms come and go.", "Needs a full day’s heart recording.", "Referred to Sahya Heart Care for a Holter test on 22 May. Urgency: routine."],
+};
+
 function runFx(name: string, arg: string | undefined, ctx: ActionContext) {
   const live = useLive.getState();
   switch (name) {
     case "say":
       return say(arg ?? "Done.");
+    case "cart": {
+      // Health store cart: add, change how many, remove, buy one thing now, or buy the whole cart.
+      const [op, item, how] = (arg ?? "").split("|");
+      const lines = readCart(live.filters.cart);
+      const line = lines.find((l) => l.name === item);
+      if (op === "add") {
+        if (line) line.qty = Math.min(line.qty + 1, 5);
+        else lines.push({ name: item, qty: 1 });
+        live.setFilter("cart", writeCart(lines));
+        return say(`${item} added to your cart.`);
+      }
+      if (op === "inc" && line) {
+        if (line.qty >= 5) return say("You can buy up to 5 of each item.");
+        line.qty += 1;
+      }
+      if (op === "dec" && line) {
+        if (line.qty <= 1) return say("Use Delete to take it out of your cart.");
+        line.qty -= 1;
+      }
+      if (op === "del") {
+        live.setFilter("cart", writeCart(lines.filter((l) => l.name !== item)));
+        return say(how === "saved" ? `${item} saved for later.` : `${item} removed from your cart.`);
+      }
+      if (op === "buy") return live.setFilter("buyNow", item);
+      if (op === "all") return live.setFilter("buyNow", "");
+      if (op === "order") {
+        const bought = live.filters.buyNow ? [{ name: live.filters.buyNow, qty: 1 }] : lines;
+        live.setFilter("lastOrder", writeCart(bought));
+        // Buying the whole cart empties it; "Buy now" leaves the cart as it was.
+        if (!live.filters.buyNow) live.setFilter("cart", "empty");
+        return;
+      }
+      return live.setFilter("cart", writeCart(lines));
+    }
+    case "timeline": {
+      // Start from what the page on screen shows, then change one of the two.
+      const [kind, label] = (arg ?? "").split("|");
+      const here = screenName();
+      const code = /· (t:\w+)$/.exec(here)?.[1];
+      let type = Object.entries(TIMELINE_TYPES).find(([, c]) => c === code)?.[0] ?? "";
+      let organ = /· o:(\w+)$/.exec(here)?.[1] ?? (code ? (live.filters.tlOrgan ?? "All") : "All");
+      if (kind === "type") type = label;
+      else organ = label;
+      live.setFilter("tlType", type);
+      live.setFilter("tlOrgan", organ);
+      const to = timelineScreen(type, organ);
+      if (to) goTo(to, { t: "d", ms: 150 });
+      return;
+    }
+    case "noteTemplate": {
+      const template = NOTE_STARTERS[arg ?? ""];
+      if (template) NOTE_FIELDS.forEach((id, i) => useDesign.getState().setValue(id, template[i]));
+      return;
+    }
+    case "pickOne": {
+      // One chip of a set is on: "chosen|id,id,…|on variant|off variant".
+      const [chosen, ids, on, off] = (arg ?? "").split("|");
+      const design = useDesign.getState();
+      ids.split(",").forEach((id) => design.setVariant(id, id === chosen ? on : off));
+      const organ = ctx.node ? collectText(ctx.node).join("").trim() : "";
+      const template = NOTE_TEMPLATES[organ];
+      if (template) NOTE_FIELDS.forEach((id, i) => design.setValue(id, template[i]));
+      return;
+    }
     case "photo":
       return pickFile("image/png,image/jpeg", (f) => {
         const reader = new FileReader();
@@ -611,6 +810,16 @@ function runFx(name: string, arg: string | undefined, ctx: ActionContext) {
     }
     case "pickUpload":
       return pickFile(".pdf,.jpg,.jpeg,.png", acceptUpload);
+    case "edit": {
+      // Opens a text in the design for editing: "nodeId|title|label|original text".
+      const [id, title, field, original] = (arg ?? "").split("|");
+      return live.openModal("value", { title, label: field, value: live.texts[id] ?? original, nodeId: id });
+    }
+    case "reel":
+      return live.openModal("reel", JSON.parse(arg ?? "{}") as Record<string, unknown>);
+    case "share":
+      void navigator.clipboard?.writeText(window.location.href).catch(() => undefined);
+      return say(arg ?? "Link copied.");
     case "useRx":
       useDesign.getState().setValue("188:4551", arg ?? "");
       return;
@@ -658,13 +867,12 @@ function runFx(name: string, arg: string | undefined, ctx: ActionContext) {
     case "saveClinic": {
       const doc = overlayDoc(ctx);
       const name = doc ? formValue("288:6494", doc) || formValue("356:6532", doc) : "";
-      const typed = useDesign.getState().values["288:6494"];
-      if (doc && doc.id === "288:6467" && !typed?.trim()) return say("Enter the clinic’s name first.");
-      const address = useDesign.getState().values["288:6501"]?.trim() ?? "Address to be confirmed";
+      if (doc && doc.id === "288:6467" && !name) return say("Enter the clinic’s name first.");
+      const address = (doc && formValue("288:6501", doc)) || "Address to be confirmed";
       const list = live.filters.clinics ? `${live.filters.clinics}\n` : "";
-      live.setFilter("clinics", `${list}${typed?.trim() || name}|${address}`);
+      live.setFilter("clinics", `${list}${name}|${address}`);
       useDesign.getState().closeOverlay(ctx.overlay);
-      return say("Clinic added to My clinics.");
+      return say(/^Register/.test(screenName()) ? `${name} added. It is verified after you submit.` : "Clinic added to My clinics.");
     }
     default:
       return;

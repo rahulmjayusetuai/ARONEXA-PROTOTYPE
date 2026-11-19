@@ -122,13 +122,15 @@ export function DateField({ value, style, label, onChange, withDay }: { value: s
   );
 }
 
-export function SelectField({ value, options, style, label, onChange }: { value: string; options: string[]; style: CSSProperties; label: string; onChange: (v: string) => void }) {
+export function SelectField({ value, options, style, label, onChange, multi = false, caret = false }: { value: string; options: string[]; style: CSSProperties; label: string; onChange: (v: string) => void; multi?: boolean; caret?: boolean }) {
   const [open, setOpen] = useState(false);
+  const chosen = multi ? value.split(", ").filter(Boolean) : [value];
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   return (
     <>
       <button ref={setAnchor} type="button" aria-label={label} aria-expanded={open} aria-haspopup="listbox" className="fg-field lv-fieldbtn" style={style} onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>
         {value}
+        {caret ? " ▾" : ""}
       </button>
       {open && (
         <Popup anchor={anchor} onClose={() => setOpen(false)}>
@@ -137,12 +139,18 @@ export function SelectField({ value, options, style, label, onChange }: { value:
               <button
                 type="button"
                 role="option"
-                aria-selected={o === value}
+                aria-selected={chosen.includes(o)}
                 key={o}
-                className={o === value ? "is-on" : ""}
+                className={chosen.includes(o) ? "is-on" : ""}
                 onClick={() => {
-                  onChange(o);
-                  setOpen(false);
+                  if (!multi) {
+                    onChange(o);
+                    setOpen(false);
+                    return;
+                  }
+                  // Several can be picked; at least one stays picked. They keep the list's order.
+                  const next = chosen.includes(o) ? chosen.filter((c) => c !== o) : [...chosen, o];
+                  if (next.length) onChange(options.filter((c) => next.includes(c)).join(", "));
                 }}
               >
                 {o}
@@ -175,6 +183,7 @@ const OPTIONS: [RegExp, string[]][] = [
   [/^Travancore-Cochin Council/, COUNCIL],
   [/^Cardiology$/, SPECIALITY],
   [/^Thanal Heart Clinic$/, ["Thanal Heart Clinic", "Sahya Heart Care"]],
+  [/^Kakkanad, Kochi$/, ["Kakkanad, Kochi", "Edappally, Kochi", "Aluva", "Fort Kochi", "Thrissur", "Kottayam"]],
   [/^15 minutes$/, ["10 minutes", "15 minutes", "20 minutes", "30 minutes"]],
   [/^Ernakulam$/, DISTRICTS],
   [/^Owner$/, ["Owner", "Visiting consultant", "Staff doctor"]],
@@ -182,8 +191,12 @@ const OPTIONS: [RegExp, string[]][] = [
   [/^2014$/, YEARS],
   [/^Once a day$/, ["Once a day", "Twice a day", "Three times a day", "At bedtime", "When needed"]],
   [/^3 days$/, ["3 days", "5 days", "7 days", "10 days", "14 days", "1 month", "3 months"]],
-  [/^English, Malayalam, Hindi$/, ["English, Malayalam, Hindi", "English, Malayalam", "English", "Malayalam", "Hindi"]],
+  [/^English, Malayalam, Hindi$/, ["English", "Malayalam", "Hindi", "Tamil", "Kannada", "Telugu", "Urdu"]],
+  [/^ഇംഗ്ലീഷ്, മലയാളം, ഹിന്ദി$/, ["ഇംഗ്ലീഷ്", "മലയാളം", "ഹിന്ദി", "തമിഴ്", "കന്നഡ", "തെലുങ്ക്", "ഉറുദു"]],
 ];
+
+// Fields where more than one choice can be picked, such as the languages a doctor consults in.
+export const isMultiChoice = (value: string) => /^(English, Malayalam, Hindi|ഇംഗ്ലീഷ്, മലയാളം, ഹിന്ദി)$/.test(value.replace(/\s*▾\s*$/, "").trim());
 
 export function optionsFor(value: string): string[] | null {
   const clean = value.replace(/\s*▾\s*$/, "").trim();

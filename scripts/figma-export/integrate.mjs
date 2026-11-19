@@ -24,7 +24,7 @@ const MODULES = [
   [/^Rider/, "rider"],
   [/^(Login · AroNexa team|Platform web|Pl(Modal|Toast)|Support web|Sp(Modal|Toast))/, "team"],
   [/^(Login · (Insurer|Dealer|Seller)|(Insurer|Dealer|Seller) web|(In|Dl|Sl)(Modal|Toast))/, "partner"],
-  [/^(Patient web|Patient sign up|Login · Patient|PModal|PToast)/, "patient"],
+  [/^(Patient web|Patient mobile|Patient sign up|Login · Patient|PModal|PToast)/, "patient"],
 ];
 // Where each area starts (its sign-in) and the page its Back button falls back to.
 const AREAS = {

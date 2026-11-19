@@ -1,7 +1,9 @@
 import type { DesignNode } from "../types";
 import { isPatientScreen, patientDoc } from "./patient";
-import { baseAppointments, collectedExtra, TODAY } from "./schedule";
+import { ALL_PATIENTS, baseAppointments, collectedExtra, TODAY } from "./schedule";
 import { useLive } from "./state";
+import EXPLAIN_AUDIO from "./explain-audio.json";
+import manifest from "../manifest.json";
 
 type Live = ReturnType<typeof useLive.getState>;
 
@@ -30,18 +32,27 @@ function pathTo(root: DesignNode, id: string): DesignNode[] | null {
 }
 
 // The layout is absolute, so a change in height moves what sits below it, level by level.
+const bottomOf = (n: DesignNode) => Math.max(0, ...(n.ch ?? []).map((c) => c.y + c.h));
+
+// Moves everything below fromY by delta, up through the parents. When content is removed,
+// a parent never shrinks past its other content, so a short list doesn't cut off the panel beside it.
 function shiftBelow(root: DesignNode, parentId: string, fromY: number, delta: number) {
   const path = pathTo(root, parentId);
   if (!path) return;
+  const pads = path.map((p) => p.h - bottomOf(p));
   let y = fromY;
-  for (let i = path.length - 1; i >= 0; i--) {
+  let d = delta;
+  for (let i = path.length - 1; i >= 0 && d !== 0; i--) {
     const p = path[i];
     const bottom = p.y + p.h;
     p.ch?.forEach((c) => {
-      if (c.y >= y - 0.5) c.y += delta;
+      if (c.y >= y - 0.5) c.y += d;
     });
     if (p.sc) return;
-    p.h += delta;
+    let h = p.h + d;
+    if (d < 0 && i < path.length - 1) h = Math.max(h, bottomOf(p) + Math.max(pads[i], 0));
+    d = h - p.h;
+    p.h = h;
     y = bottom;
   }
 }
@@ -125,7 +136,71 @@ function allergies(root: DesignNode, live: Live) {
 
 const labelOfType = (t: string) => (t === "Food" ? "Food allergies" : t === "Environmental" ? "Environmental" : "Drug allergies");
 
+export const TIMELINE_TYPES: Record<string, string> = {
+  "Doctor visits": "t:visit",
+  "Scans and reports": "t:scan",
+  "Lab tests": "t:lab",
+  Medicines: "t:med",
+  Emergency: "t:er",
+  Physiotherapy: "t:physio",
+  Allergies: "t:allergy",
+};
+
+// The timeline's "Show" list and organ chips work together: the page for the chosen type,
+// narrowed to the chosen organ.
+export function timelineScreen(type: string, organ: string) {
+  const code = TIMELINE_TYPES[type];
+  const named = code ? `Patient / Timeline · ${code}` : organ && organ !== "All" ? `Patient / Timeline · o:${organ}` : "Patient / Timeline";
+  return manifest.screens.find((s) => s.name === named)?.id;
+}
+
+function timelineFilters(root: DesignNode, live: Live, name: string) {
+  const organ = live.filters.tlOrgan ?? "";
+  const show = findNode(root, (n) => n.n === "Title" && n.tx?.v === "Show");
+  const showPanel = show && pathTo(root, show.id)?.at(-2);
+  for (const row of showPanel?.ch?.filter((c) => /^State=/.test(c.n ?? "")) ?? []) {
+    const label = textOf(row).replace(/\s*\d+\s*$/, "").trim();
+    row.a = [{ on: "click", acts: [{ k: "fx", fx: "timeline", arg: `type|${label === "All events" ? "" : label}` }] }];
+  }
+  const organTitle = findNode(root, (n) => n.n === "Title" && n.tx?.v === "Organ");
+  const organPanel = organTitle && pathTo(root, organTitle.id)?.at(-2);
+  const chips: DesignNode[] = [];
+  const walk = (n: DesignNode) => {
+    if (/^State=/.test(n.n ?? "") && n.t === "I") chips.push(n);
+    else n.ch?.forEach(walk);
+  };
+  organPanel?.ch?.forEach(walk);
+  for (const chip of chips) chip.a = [{ on: "click", acts: [{ k: "fx", fx: "timeline", arg: `organ|${textOf(chip).trim()}` }] }];
+  // A type page narrowed to one organ: show that organ's chip as chosen and keep only its events.
+  if (!name.includes("· t:") || !organ || organ === "All") return;
+  const on = chips.find((c) => c.n === "State=On");
+  const off = chips.find((c) => c.n === "State=Off");
+  if (on && off) {
+    const look = (c: DesignNode) => JSON.parse(JSON.stringify({ p: c.p, k: c.k, text: findNode(c, (x) => Boolean(x.tx))?.p }));
+    const [onLook, offLook] = [look(on), look(off)];
+    for (const chip of chips) {
+      const style = textOf(chip).trim() === organ ? onLook : offLook;
+      chip.p = style.p;
+      chip.k = style.k;
+      const label = findNode(chip, (x) => Boolean(x.tx));
+      if (label) label.p = style.text;
+    }
+  }
+  const months = findNode(root, (n) => (n.ch?.filter((c) => c.ch?.some((m) => m.ch?.some((t) => t.n === "Month"))).length ?? 0) >= 1 && (n.ch?.length ?? 0) >= 2);
+  if (!months) return;
+  for (const group of [...(months.ch ?? [])]) {
+    const events = group.ch?.filter((c) => findNode(c, (x) => x.n === "Where")) ?? [];
+    const gone = events.filter((e) => {
+      const where = findNode(e, (x) => x.n === "Where")?.tx?.v ?? "";
+      return !where.split(" · ")[0].includes(organ) && !/All organs/.test(where);
+    });
+    if (gone.length === events.length && events.length) removeRows(root, months, [group]);
+    else if (gone.length) removeRows(root, group, gone);
+  }
+}
+
 function timeline(root: DesignNode, live: Live, name: string) {
+  timelineFilters(root, live, name);
   const column = findNode(root, (n) => n.id === "181:3903");
   const allowed: Record<string, string> = { "t:visit": "Doctor visit", "t:scan": "Scan", "t:lab": "Lab test", "t:med": "Medicine", "t:er": "Emergency" };
   const tab = name.split(" · ")[1];
@@ -182,7 +257,7 @@ function medicines(root: DesignNode, live: Live) {
       tone: "plain",
       title: `${m.name} · ${m.dose}`,
       detail: `${m.often} · ${m.when || "Any time"} · for ${m.length}`,
-      meta: `Sent to ${m.pharmacy} · Dr. Arjun Mehta · 15 May 2025`,
+      meta: `${m.pharmacy ? `Sent to ${m.pharmacy}` : "Prescription issued"} · Dr. Arjun Mehta · 15 May 2025`,
       badge: "New",
     }), 10);
   });
@@ -201,7 +276,7 @@ function orders(root: DesignNode, live: Live, name: string) {
     insertAt(root, root, y, liveRow(`row-${o.id}`, 24, 1392, 92, {
       tone: "plain",
       title: `${o.type || "Test"}: ${o.test}`,
-      detail: `${o.lab} · ${o.urgency || "Routine"}`,
+      detail: [o.lab, o.urgency || "Routine"].filter(Boolean).join(" · "),
       meta: `Do before ${o.before} · Ordered today by Dr. Arjun Mehta`,
       badge: "Ordered, result pending",
     }), 12);
@@ -273,7 +348,8 @@ function visitFilter(root: DesignNode, live: Live) {
 }
 
 function notesFilter(root: DesignNode, live: Live) {
-  const list = findNode(root, (n) => n.id === "184:4057");
+  // The column of note cards; the saved-note version of the page has its own ids.
+  const list = findNode(root, (n) => (n.ch?.filter((c) => allText(c).some((t) => t.startsWith("Symptoms (what the patient says)"))).length ?? 0) >= 3);
   if (!list) return;
   const organ = live.filters.noteOrgan;
   const type = live.filters.noteType;
@@ -412,6 +488,203 @@ function homeCards(root: DesignNode, name: string) {
   walk(root);
 }
 
+// The organ a body map, scans or scan detail page is about.
+export function scanOrganOf(name: string, chestFrom?: string) {
+  if (/^Scan detail \/ Heart – Chest X-ray/.test(name)) return chestFrom === "Lungs" ? "Lungs" : "Heart";
+  return /(?:Body map – |Scans · |Scan detail \/ )(Heart|Lungs|Brain|Liver|Stomach|Kidneys|Intestines|Joints)\b/.exec(name)?.[1];
+}
+
+const textOf = (n: DesignNode): string => (n.tx ? n.tx.v : (n.ch ?? []).map(textOf).join(" "));
+
+// The availability box shows the hours of the clinic picked above it. Sahya Heart Care keeps
+// its own hours (Tue and Thu, 5 to 8 PM, as on its clinic card), so its fields get their own ids.
+const SAHYA_DAYS: Record<string, [string, string]> = { Tuesday: ["05:00 PM", "08:00 PM"], Thursday: ["05:00 PM", "08:00 PM"] };
+
+function availability(root: DesignNode, live: Live) {
+  if (live.filters["select:286:6688"] !== "Sahya Heart Care") return;
+  const sunday = findNode(root, (n) => n.n === "Day / Sunday");
+  const offToggle = sunday?.ch?.find((c) => c.n === "Toggle switch");
+  const offText = sunday?.ch?.find((c) => c.t === "F" && textOf(c).trim() === "Not available");
+  const rows: DesignNode[] = [];
+  const walk = (n: DesignNode) => {
+    if (/^Day \//.test(n.n ?? "") && n.n !== "Day / Sunday") rows.push(n);
+    else n.ch?.forEach(walk);
+  };
+  walk(root);
+  for (const row of rows) {
+    const day = (row.n ?? "").slice(6);
+    const own = (n: DesignNode) => {
+      n.id = `sahya:${n.id}`;
+      n.ch?.forEach(own);
+    };
+    const hours = SAHYA_DAYS[day];
+    if (hours) {
+      let i = 0;
+      const set = (n: DesignNode) => {
+        if (n.tx && /^\d{2}:\d{2} (AM|PM)$/.test(n.tx.v)) n.tx = { ...n.tx, v: hours[i++] ?? n.tx.v };
+        n.ch?.forEach(set);
+      };
+      set(row);
+      row.ch?.forEach(own);
+      continue;
+    }
+    if (!offToggle || !offText || !sunday) continue;
+    // A day Sahya is closed: drawn like Sunday, with the switch off and "Not available".
+    const label = row.ch?.[0];
+    const lift = (row.h - sunday.h) / 2;
+    const copy = (n: DesignNode): DesignNode => ({ ...JSON.parse(JSON.stringify(n)), y: n.y + lift });
+    row.ch = [...(label ? [label] : []), copy(offToggle), copy(offText)];
+    row.ch.forEach(own);
+  }
+}
+
+// A scan's page leads back to its own organ. The chest X-ray is shared by the heart and the lungs,
+// so it shows the list and the way back for the organ the doctor came from.
+function scanDetail(root: DesignNode, name: string, live: Live) {
+  const organ = scanOrganOf(name, live.filters.scanOrgan);
+  if (!organ) return;
+  const screenId = (n: string) => manifest.screens.find((s) => s.name === n)?.id;
+  const bodyMap = screenId(`Doctor view / Body map – ${organ}`);
+  const scans = screenId(`Patient / Scans · ${organ}`);
+  const nav = (to?: string): DesignNode["a"] => (to ? [{ on: "click", acts: [{ k: "nav", to }] }] : undefined);
+  const label = findNode(root, (n) => n.t === "T" && /^Back to /.test(n.tx?.v ?? ""));
+  const back = label && pathTo(root, label.id)?.at(-2);
+  if (label?.tx && back) {
+    label.tx = { ...label.tx, v: `Back to ${organ}` };
+    back.a = nav(bodyMap);
+  }
+  const crumb = (i: number) => findNode(root, (n) => n.n === `Crumb ${i}` && Boolean(n.tx));
+  const c0 = crumb(0);
+  const c1 = crumb(1);
+  const c2 = crumb(2);
+  if (c0) c0.a = nav(bodyMap);
+  if (c1?.tx) {
+    c1.tx = { ...c1.tx, v: organ };
+    c1.a = nav(bodyMap);
+  }
+  if (c2) c2.a = nav(scans);
+  if (!/^Scan detail \/ Heart – Chest X-ray/.test(name)) return;
+  // Keep only this organ's scans in the strip, in the order its body map lists them.
+  const heading = findNode(root, (n) => n.n === "Tabs label" && Boolean(n.tx));
+  const strip = heading && pathTo(root, heading.id)?.at(-2);
+  if (!heading?.tx || !strip?.ch) return;
+  heading.tx = { ...heading.tx, v: organ === "Lungs" ? "Lung scans and reports" : "Heart scans and reports" };
+  const tabs = strip.ch.filter((c) => /^Selected=/.test(c.n ?? "")).sort((a, b) => a.x - b.x);
+  const others = organ === "Lungs" ? /^(Resting ECG|Echocardiogram)/ : /^Spirometry/;
+  const keep = tabs.filter((t) => !others.test(textOf(t).trim()));
+  const gap = tabs.length > 1 ? tabs[1].x - (tabs[0].x + tabs[0].w) : 10;
+  strip.ch = strip.ch.filter((c) => !tabs.includes(c) || keep.includes(c));
+  let x = tabs[0]?.x ?? 0;
+  for (const t of keep) {
+    t.x = x;
+    x += t.w + gap;
+  }
+}
+
+// Booking the lipid profile on Lab tests: pick the lab and collection, pay, and the test shows as booked.
+const LIPID_LABS: Record<string, { card: string; total: string; when: string }> = {
+  Thejus: { card: "402:9273", total: "₹525", when: "Thejus Clinical Lab · tomorrow 7 to 8 AM" },
+  Nila: { card: "402:9278", total: "₹585", when: "Nila Diagnostics · tomorrow 9 to 10 AM" },
+};
+
+function lipidBooking(root: DesignNode, live: Live) {
+  const byId = (id: string) => findNode(root, (n) => n.id === id);
+  const choice = live.filters.labChoice === "Nila" ? "Nila" : "Thejus";
+  const on = byId("402:9273")?.k;
+  const off = byId("402:9278")?.k;
+  for (const [lab, info] of Object.entries(LIPID_LABS)) {
+    const card = byId(info.card);
+    if (!card) continue;
+    card.k = lab === choice ? on : off;
+    card.a = [{ on: "click", acts: [{ k: "fx", fx: "pick", arg: `labChoice|${lab}|one|` }] }];
+  }
+  const where = [byId("402:9284"), byId("402:9286")].filter(Boolean) as DesignNode[];
+  if (where.length === 2) chipStyles(where, "labWhere", live);
+  const total = byId("402:9292");
+  if (total?.tx) total.tx = { ...total.tx, v: LIPID_LABS[choice].total };
+  const pay = byId("402:9293");
+  const payLabel = byId("402:9294");
+  const booked = live.filters.lipidBooked === "1";
+  if (payLabel?.tx) payLabel.tx = { ...payLabel.tx, v: booked ? "Booked and paid" : `Pay ${LIPID_LABS[choice].total} and book`, a: "CENTER" };
+  if (payLabel && pay) {
+    payLabel.x = 0;
+    payLabel.w = pay.w;
+  }
+  if (pay?.a) pay.a = booked ? undefined : [{ on: "click", acts: [{ k: "fx", fx: "pick", arg: "lipidBooked|1|one|" }, ...pay.a[0].acts] }];
+  if (!booked) return;
+  // The test in "Asked by your doctor" now reads as booked, like the Holter test above it.
+  const pill = byId("402:9188");
+  const bookedPill = byId("402:9177");
+  if (pill && bookedPill) {
+    pill.p = bookedPill.p;
+    const label = findNode(pill, (n) => Boolean(n.tx));
+    const bookedLabel = findNode(bookedPill, (n) => Boolean(n.tx));
+    if (label?.tx) {
+      label.tx = { ...label.tx, v: "Booked" };
+      label.p = bookedLabel?.p;
+    }
+    const button = byId("402:9190");
+    pill.w = 64;
+    pill.x = button ? button.x + button.w - pill.w : pill.x;
+  }
+  const line = findNode(root, (n) => n.tx?.v === "Dr. Arjun Mehta · before your 29 May review");
+  if (line?.tx) line.tx = { ...line.tx, v: `Dr. Arjun Mehta · ${LIPID_LABS[choice].when}` };
+  const book = byId("402:9190");
+  const row = book && pathTo(root, book.id)?.at(-2);
+  if (row) row.ch = row.ch?.filter((c) => c !== book);
+}
+
+// The status chips on "My reports and scans" narrow the cards, which then close up in the grid.
+const REPORT_STATUS: Record<string, RegExp> = { "Explained today": /Explained today/, Ordered: /Ordered/, Explained: /Explained/ };
+
+function reportStatus(root: DesignNode, live: Live) {
+  const chips: DesignNode[] = [];
+  const walk = (n: DesignNode) => {
+    if (/^Status filter \//.test(n.n ?? "")) chips.push(n);
+    else n.ch?.forEach(walk);
+  };
+  walk(root);
+  if (chips.length < 2) return;
+  const key = "reportStatus";
+  chipStyles(chips, key, live);
+  const test = key in live.filters ? REPORT_STATUS[live.filters[key]] : undefined;
+  const grid = findNode(root, (n) => (n.ch?.filter((c) => /^Scan card \//.test(c.n ?? "")).length ?? 0) > 0);
+  if (!test || !grid?.ch) return;
+  const cards = grid.ch.filter((c) => /^Scan card \//.test(c.n ?? ""));
+  const slots = cards.map((c) => ({ x: c.x, y: c.y })).sort((a, b) => a.y - b.y || a.x - b.x);
+  const keep = cards.filter((c) => test.test(textOf(c))).sort((a, b) => a.y - b.y || a.x - b.x);
+  const oldBottom = bottomOf(grid);
+  grid.ch = grid.ch.filter((c) => !cards.includes(c) || keep.includes(c));
+  keep.forEach((c, i) => {
+    c.x = slots[i].x;
+    c.y = slots[i].y;
+  });
+  if (!keep.length) {
+    grid.ch.push({ id: "report-none", t: "T", x: 0, y: 8, w: grid.w, h: 22, p: [{ k: "s", c: "rgb(100,116,139)" }], tx: { v: "No reports or scans with this status.", s: 15, w: 500, r: "NONE" } });
+  }
+  const delta = bottomOf(grid) - oldBottom;
+  const parent = pathTo(root, grid.id)?.at(-2);
+  if (parent && delta < 0) {
+    const gridBottom = grid.y + grid.h;
+    grid.h += delta;
+    shiftBelow(root, parent.id, gridBottom, delta);
+  }
+}
+
+// Chips drawn as separate on/off toggles that should work as one choice: picking one turns the others off.
+function oneOfSet(root: DesignNode, groupId: string) {
+  const group = findNode(root, (n) => n.id === groupId);
+  const chips = group?.ch?.filter((c) => c.t === "I" && c.a?.[0]?.acts[0]?.k === "var") ?? [];
+  const onChip = chips.find((c) => c.n === "State=On");
+  const offChip = chips.find((c) => c.n === "State=Off");
+  if (!onChip || !offChip) return;
+  // An "on" chip's click switches it to the off look, and an "off" chip's click to the on look.
+  const offVariant = (onChip.a![0].acts[0] as { to: string }).to;
+  const onVariant = (offChip.a![0].acts[0] as { to: string }).to;
+  const ids = chips.map((c) => c.id).join(",");
+  for (const chip of chips) chip.a = [{ on: "click", acts: [{ k: "fx", fx: "pickOne", arg: `${chip.id}|${ids}|${onVariant}|${offVariant}` }] }];
+}
+
 // The top search looks through everyone in the demo.
 function searchModal(root: DesignNode, live: Live) {
   const q = (live.filters.search ?? "jam").trim().toLowerCase();
@@ -419,6 +692,7 @@ function searchModal(root: DesignNode, live: Live) {
   const people = [
     ...baseAppointments(TODAY, "thanal", live.walkIns),
     ...baseAppointments(TODAY, "sahya"),
+    ...ALL_PATIENTS,
     { name: "James Varghese", who: "M, 61", pid: "ANX-60412" },
     { name: "Jameela K.", who: "F, 45", pid: "ANX-70833" },
   ].filter((p) => {
@@ -434,7 +708,9 @@ function searchModal(root: DesignNode, live: Live) {
   if (extra > 0) {
     // More matches than the design drew: repeat its row and grow the pop-up.
     const last = rows[rows.length - 1];
-    for (let i = 0; i < Math.min(extra, 5); i++) {
+    for (let i = 0; i < extra; i++) {
+      // The pop-up grows by three rows, then the list scrolls.
+      if (i === 3) list.sc = "V";
       const copy: DesignNode = JSON.parse(JSON.stringify(last));
       copy.id = `search-${i}`;
       const rename = (n: DesignNode) => {
@@ -491,14 +767,14 @@ function notifications(root: DesignNode, name: string) {
   });
 }
 
-// The Malayalam voice needs longer on the second and third scenes than the design's storyboard gives them.
+// The Malayalam voice needs longer on each scene than the design's storyboard gives them.
 const VIDEOS: Record<string, { file: string; lang: "en" | "ml"; other: string; times?: Record<string, string> }> = {
   "Modal / video preview · heart tracing (ECG)": { file: "heart-tracing-ecg", lang: "en", other: "368:7095" },
   "Modal / video preview · heart tracing (ECG) (Malayalam)": {
     file: "heart-tracing-ecg-ml",
     lang: "ml",
     other: "368:6512",
-    times: { "0:00 to 0:08": "0:00 to 0:04", "0:08 to 0:22": "0:04 to 0:19", "0:22 to 0:30": "0:19 to 0:30" },
+    times: { "0:00 to 0:08": "0:00 to 0:04", "0:08 to 0:22": "0:04 to 0:22", "0:22 to 0:30": "0:22 to 0:34" },
   },
 };
 
@@ -530,6 +806,26 @@ function videoPlayer(root: DesignNode, name: string) {
   }
   bar.live = "player";
   bar.props = { lines };
+  const audio = (EXPLAIN_AUDIO as Record<string, { file: string; starts: number[]; length: number }>)[name];
+  if (audio) {
+    // A narrated track in the patient's language. The storyboard's times follow the voice.
+    // The same explainer in the other language is its own screen, so the switch moves to it.
+    const ml = name.endsWith(" (Malayalam)");
+    const otherName = ml ? name.slice(0, -" (Malayalam)".length) : `${name} (Malayalam)`;
+    const other = manifest.screens.find((s) => s.name === otherName)?.id;
+    bar.props = { lines, src: `/video/${audio.file}.mp3`, length: audio.length, lang: ml ? "ml" : "en", other };
+    const clock = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+    const ends = [...audio.starts.slice(1), audio.length];
+    let scene = 0;
+    const retime = (n: DesignNode) => {
+      if (n.n === "Time" && n.tx && / to /.test(n.tx.v) && scene < ends.length) {
+        n.tx.v = `${clock(scene ? Math.round(audio.starts[scene]) : 0)} to ${clock(Math.round(ends[scene]))}`;
+        scene += 1;
+      }
+      n.ch?.forEach(retime);
+    };
+    retime(root);
+  }
   bar.ch = [];
 }
 
@@ -579,7 +875,19 @@ function clinicForm(root: DesignNode, live: Live) {
 
 function addedClinics(root: DesignNode, live: Live) {
   const added = (live.filters.clinics ?? "").split("\n").filter(Boolean);
-  const anchor = findNode(root, (n) => allText(n).join("") === "+ Add new clinic" && n.w > 500);
+  // The review step lists clinics as lines, so each added clinic gets a line of its own.
+  const lastLine = findNode(root, (n) => n.id === "248:6558");
+  const box = lastLine && pathTo(root, lastLine.id)?.at(-2);
+  if (lastLine?.tx && box && added.length) {
+    added.forEach((line, i) => {
+      const [name, detail] = line.split("|");
+      const copy: DesignNode = { ...lastLine, id: `review-clinic-${i}`, tx: { ...lastLine.tx!, v: `${name} · ${detail} · waiting for verification` } };
+      insertAt(root, box, lastLine.y + 24 * (i + 1), copy, 6);
+    });
+    const count = findNode(root, (n) => n.tx?.v === "2 locations");
+    if (count?.tx) count.tx = { ...count.tx, v: `${2 + added.length} locations` };
+  }
+  const anchor = findNode(root, (n) => /^\+\s+Add (new clinic|a clinic without HFR ID)$/.test(allText(n).join("")) && n.w > 500);
   if (!anchor || !added.length) return;
   const path = pathTo(root, anchor.id);
   const parent = path?.[path.length - 2];
@@ -602,13 +910,34 @@ function insurers(root: DesignNode, live: Live) {
   });
 }
 
+// On/off switches in the portals' settings (the patient app wires its own in patient.ts).
+function switches(root: DesignNode, live: Live) {
+  const TEAL = "rgb(20,184,166)";
+  const walk = (n: DesignNode) => {
+    if (n.n === "Switch" && !n.a && n.ch?.length === 1) {
+      const initial = n.p?.[0]?.k === "s" && n.p[0].c === TEAL;
+      const on = live.checks[n.id] ?? initial;
+      n.a = [{ on: "click", acts: [{ k: "fx", fx: "check", arg: `${n.id}|${initial ? 1 : 0}` }] }];
+      n.role = "checkbox";
+      n.pressed = on;
+      n.p = [{ k: "s", c: on ? TEAL : "rgb(203,213,225)" }];
+      const knob = n.ch[0];
+      knob.x = on ? n.w - knob.w - 3 : 3;
+    }
+    n.ch?.forEach(walk);
+  };
+  walk(root);
+}
+
 // A small box beside a label is a checkbox, and the design left all of these unwired.
 function checkboxes(root: DesignNode, live: Live) {
   const walk = (n: DesignNode) => {
     const kids = n.ch ?? [];
     const label = kids.find((c) => c.t === "T" && c.n === "Label");
     const box = kids.find((c) => c.t !== "T" && c.w <= 22 && c.h <= 22 && c.w >= 14);
-    if (label && box && kids.length === 2 && n.h <= 30 && !n.a) {
+    // A filled colour swatch with no tick is a legend key (Stable, Monitor, Needs attention), not a checkbox.
+    const swatch = box && !box.g && !box.ch?.length && !box.k && Boolean(box.p?.length) && !/^rgb\(255, ?255, ?255\)$/.test((box.p?.[0] as { c?: string })?.c ?? "");
+    if (label && box && !swatch && kids.length === 2 && n.h <= 30 && !n.a) {
       const hasTick = Boolean(box.g || box.ch?.length);
       const on = live.checks[n.id] ?? hasTick;
       n.a = [{ on: "click", acts: [{ k: "fx", fx: "check", arg: `${n.id}|${hasTick ? 1 : 0}` }] }];
@@ -645,6 +974,130 @@ function bodyMap(root: DesignNode) {
 }
 
 // Rebuilds a screen from its design plus what the doctor has done, so lists and numbers stay true.
+
+// Filter chips the design drew without links: each one now narrows the list beside it.
+type ListFilter = { rows: (n: DesignNode) => boolean; keep: Record<string, (text: string) => boolean> };
+const LIST_FILTERS: Record<string, ListFilter> = {
+  "Lab web / Requests": {
+    rows: (n) => /^Request \//.test(n.n ?? ""),
+    keep: { "Doctor-requested": (t) => /\bDr\. /.test(t), "Patient-selected": (t) => /Patient-selected/.test(t), Urgent: (t) => /Urgent/.test(t) },
+  },
+  "Platform web / Verification": {
+    rows: (n) => /^Case \//.test(n.n ?? ""),
+    keep: { Doctors: (t) => / Doctor /.test(t), Clinics: (t) => / Clinic /.test(t), Pharmacies: (t) => / Pharmacy /.test(t), Labs: (t) => / Laboratory /.test(t) },
+  },
+  "Support web / Tickets": {
+    rows: (n) => /^Ticket \//.test(n.n ?? ""),
+    keep: { Mine: (t) => / You$/.test(t), "Clinical safety": (t) => /Clinical safety/.test(t), Privacy: (t) => /Privacy/.test(t) },
+  },
+  "Insurer web / Claims": {
+    rows: (n) => /^Claim \//.test(n.n ?? ""),
+    keep: { Submitted: (t) => /SUBMITTED/.test(t), "Under review": (t) => /UNDER REVIEW/.test(t), Clarification: (t) => /CLARIFICATION/.test(t), Flagged: (t) => /Flagged/.test(t) },
+  },
+  "Dealer web / Catalogue": {
+    rows: (n) => /^Product \//.test(n.n ?? ""),
+    keep: { Medicines: (t) => /Medicine ·/.test(t), Consumables: (t) => /Consumable ·/.test(t), Equipment: (t) => /Equipment ·/.test(t) },
+  },
+  "Reception web / Live queue": {
+    rows: (n) => /^Queue row \//.test(n.n ?? ""),
+    keep: { "AroNexa app": (t) => /AroNexa app/.test(t), "Phone & WhatsApp": (t) => /\b(Phone|WhatsApp)\b/.test(t), "Walk-in": (t) => /walk-in/i.test(t) },
+  },
+  "Dealer web / RFQs": {
+    rows: (n) => /^RFQ \//.test(n.n ?? ""),
+    keep: { New: (t) => / New$/.test(t), Quoted: (t) => / Quoted$/.test(t), Selected: (t) => / Selected$/.test(t) },
+  },
+  "Seller web / Orders": {
+    rows: (n) => /^Order \//.test(n.n ?? ""),
+    keep: { New: (t) => / New /.test(t), "To pack": (t) => / Confirmed /.test(t), Dispatched: (t) => / Dispatched /.test(t), Returns: (t) => /Return/.test(t) },
+  },
+  "Pathologist web / To review": {
+    rows: (n) => /^Report \//.test(n.n ?? ""),
+    keep: { Urgent: (t) => / Urgent /.test(t) },
+  },
+  "Patient web / Bills & payments": {
+    rows: (n) => n.t === "F" && /^\d\d [A-Z][a-z]{2} /.test(allText(n).join(" ")) && n.h < 90,
+    keep: {
+      "Clinic visits": (t) => !/Refund/.test(t) && /(Clinic|Centre) ·|booking fee/.test(t),
+      Medicines: (t) => /Medicals|medicines/.test(t) && !/Refund/.test(t),
+      "Lab tests": (t) => /Lab|Diagnostics/.test(t) && !/Refund/.test(t),
+      Refunds: (t) => /Refund/.test(t),
+    },
+  },
+};
+
+const chipLabel = (n: DesignNode) => allText(n).join(" ").trim();
+const withoutCount = (label: string) => label.replace(/\s+\d+$/, "");
+
+// Chips the design drew as a single choice (a reason, a payment method, a period) but left unlinked.
+function choiceChips(root: DesignNode, live: Live) {
+  const isChip = (c: DesignNode) => /^(Chip|Sort) \//.test(c.n ?? "") && !c.a;
+  const walk = (n: DesignNode) => {
+    const chips = n.ch?.filter(isChip) ?? [];
+    if (chips.length >= 2) chipStyles(chips, `pick:${n.id}`, live);
+    n.ch?.forEach(walk);
+  };
+  walk(root);
+}
+
+// Gives each chip the look of the design's chosen or unchosen chip, and a click that chooses it.
+// Returns the chosen label, or nothing when the design shows no chosen chip to copy.
+function chipStyles(chips: DesignNode[], key: string, live: Live) {
+  const lookOf = (c: DesignNode) => JSON.stringify([c.p ?? null, c.k ?? null]);
+  const counts = new Map<string, number>();
+  chips.forEach((c) => counts.set(lookOf(c), (counts.get(lookOf(c)) ?? 0) + 1));
+  const designedOn = chips.find((c) => counts.get(lookOf(c)) === 1 && chips.length > 2) ?? (counts.size === 2 && chips.length === 2 ? chips[0] : undefined);
+  if (!designedOn) return undefined;
+  const designedOff = chips.find((c) => lookOf(c) !== lookOf(designedOn));
+  if (!designedOff) return undefined;
+  const look = (c: DesignNode) => JSON.parse(JSON.stringify({ p: c.p, k: c.k, text: findNode(c, (x) => Boolean(x.tx))?.p }));
+  const on = look(designedOn);
+  const off = look(designedOff);
+  const picked = live.filters[key] ?? chipLabel(designedOn);
+  for (const chip of chips) {
+    const label = chipLabel(chip);
+    const yes = label === picked;
+    const style = yes ? on : off;
+    chip.p = style.p;
+    chip.k = style.k;
+    const paintText = (n: DesignNode) => {
+      if (n.tx && style.text) n.p = style.text;
+      n.ch?.forEach(paintText);
+    };
+    paintText(chip);
+    chip.a = [{ on: "click", acts: [{ k: "fx", fx: "pick", arg: `${key}|${label}|one|` }] }];
+    chip.role = "button";
+    chip.pressed = yes;
+  }
+  return picked;
+}
+
+function listFilters(root: DesignNode, name: string, live: Live) {
+  const config = LIST_FILTERS[name];
+  if (!config) return;
+  const group = findNode(root, (n) => (n.ch?.filter((c) => /^(Chip|Filter) \//.test(c.n ?? "") && !c.a).length ?? 0) >= 2 && /^(All|New)\b/.test(chipLabel(n.ch!.find((c) => /^(Chip|Filter) \//.test(c.n ?? ""))!)));
+  if (!group) return;
+  const chips = group.ch!.filter((c) => /^(Chip|Filter) \//.test(c.n ?? ""));
+  const key = `pick:${group.id}`;
+  const picked = chipStyles(chips, key, live);
+  if (!picked) return;
+  // Until a chip is pressed the list stays as the design drew it.
+  const keep = key in live.filters ? config.keep[withoutCount(picked)] : undefined;
+  if (!keep) return;
+  const rows: DesignNode[] = [];
+  const collect = (n: DesignNode) => {
+    if (n !== group && config.rows(n)) rows.push(n);
+    else n.ch?.forEach(collect);
+  };
+  collect(root);
+  const byParent = new Map<DesignNode, DesignNode[]>();
+  for (const row of rows) {
+    if (keep(allText(row).join(" "))) continue;
+    const parent = (pathTo(root, row.id) ?? []).at(-2);
+    if (parent) byParent.set(parent, [...(byParent.get(parent) ?? []), row]);
+  }
+  byParent.forEach((gone, parent) => removeRows(root, parent, gone));
+}
+
 export function liveDoc(doc: DesignNode, name: string, live: Live) {
   const root: DesignNode = JSON.parse(JSON.stringify(doc));
   bodyMap(root);
@@ -658,19 +1111,64 @@ export function liveDoc(doc: DesignNode, name: string, live: Live) {
   homeCards(root, name);
   notifications(root, name);
   if (name.startsWith("Doctor view /") || name.startsWith("Patient / Overview")) visitFilter(root, live);
-  if (name.startsWith("Patient / Clinical notes")) notesFilter(root, live);
+  if (name.startsWith("Patient / Clinical notes")) {
+    notesFilter(root, live);
+    // Each note template opens the form filled in for that kind of note.
+    for (const title of ["Follow-up visit", "New problem", "Result explained", "Referral"]) {
+      const label = findNode(root, (n) => n.n === "Title" && n.tx?.v === title);
+      const row = label && pathTo(root, label.id)?.find((p) => p.a?.[0]?.acts.some((a) => a.k === "nav"));
+      if (row?.a) row.a = [{ on: "click", acts: [{ k: "fx", fx: "noteTemplate", arg: title }, ...row.a[0].acts] }];
+    }
+  }
   if (name.startsWith("Doctor billing")) billing(root, live, name);
   if (name === "Modal / upload") uploadModal(root, live);
   if (name === "Modal / rx") rxModal(root);
   if (/^Modal \/ video preview/.test(name)) videoPlayer(root, name);
   if (/^Scan detail \/ Heart – Resting ECG/.test(name)) ecgMeasure(root);
   if (/^Modal \/ add clinic/.test(name)) clinicForm(root, live);
-  if (/^Doctor settings \/ Clinics/.test(name)) addedClinics(root, live);
+  if (/^Doctor settings \/ Clinics/.test(name) || /^Register \/ (3 Clinic locations|4 Review)/.test(name)) addedClinics(root, live);
   if (/^Modal \/ billing settings \(insurance/.test(name)) insurers(root, live);
   if (name === "Modal / search") searchModal(root, live);
-  if (name === "Doctor view / Add clinical note") noteAttachments(root, live);
+  if (name.startsWith("Scan detail /")) scanDetail(root, name, live);
+  if (name === "Doctor settings / Clinics and availability") availability(root, live);
+  if (name.startsWith("Explain to patient /")) {
+    // The doctor can reword the summary before it is sent.
+    const message = findNode(root, (n) => n.n === "Message" && Boolean(n.tx));
+    const box = message && pathTo(root, message.id)?.at(-2);
+    if (message?.tx && box && !box.a) {
+      box.n = "Input";
+      message.n = "Value";
+      message.tx = { ...message.tx, r: "HEIGHT" };
+    }
+  }
+  if (name === "Doctor view / Add clinical note") {
+    noteAttachments(root, live);
+    oneOfSet(root, "184:4605");
+    oneOfSet(root, "184:4627");
+  }
   if (isPatientScreen(name)) patientDoc(root, name, live);
+  if (name.startsWith("Patient web / Reports & scans")) reportStatus(root, live);
+  if (name === "Patient web / Lab tests") lipidBooking(root, live);
+  if (name.startsWith("Patient web / Compare lab quotes")) {
+    // Choosing a lab carries the choice to the booking box on Lab tests.
+    for (const lab of ["Thejus", "Nila"]) {
+      const button = findNode(root, (n) => n.n === `Button / Choose ${lab}`);
+      if (button?.a) button.a = [{ on: "click", acts: [{ k: "fx", fx: "pick", arg: `labChoice|${lab}|one|` }, ...button.a[0].acts] }];
+    }
+  }
+  if (name === "PModal / Running late") {
+    // The patient picks how late they will be.
+    const row = findNode(root, (n) => n.n === "Row" && (n.ch?.length ?? 0) === 4);
+    if (row?.ch) chipStyles(row.ch, "lateBy", live);
+  }
+  if (/^PToast/.test(name) && live.filters.lateBy) {
+    const kept = findNode(root, (n) => n.tx?.v === "Your place is kept.");
+    if (kept?.tx) kept.tx = { ...kept.tx, v: `Told the clinic you are ${live.filters.lateBy} late. Your place is kept.` };
+  }
   checkboxes(root, live);
+  if (!isPatientScreen(name)) switches(root, live);
+  listFilters(root, name, live);
+  choiceChips(root, live);
   clinicalProfile(root, live);
   applyHidden(root, live);
   return root;

@@ -79,9 +79,13 @@ body {
   z-index: 100;
 }
 
-/* Tall enough for the longest step, so the buttons stay put from step to step. */
+.lv-guide .lv-dialog {
+  width: min(880px, 100%);
+}
+
 .lv-guide .lv-dialog-body {
-  min-height: 268px;
+  padding: 0;
+  background: #000;
 }
 
 .lv-guide .lv-dialog-foot {
@@ -92,23 +96,37 @@ body {
   margin-right: auto;
 }
 
-.lv-guide-step {
-  font-size: 15px;
-  line-height: 1.5;
-  animation: fg-fade 0.24s ease-out;
+.lv-guide-lang {
+  margin-right: auto;
 }
 
-.lv-guide-step p {
-  margin: 0 0 12px;
+.lv-guide-open {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--lv-navy);
+  color: #fff;
+  font: 600 14px var(--font-manrope), sans-serif;
+  box-shadow: 0 8px 24px rgba(3, 28, 84, 0.3);
+  cursor: pointer;
 }
 
-.lv-guide-step ul {
-  margin: 0;
-  padding-left: 20px;
+.lv-guide-open:hover {
+  filter: brightness(1.15);
 }
 
-.lv-guide-step li + li {
-  margin-top: 10px;
+.lv-guide-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
 }
 
 /* The calendar panel eases in and out by itself while the page behind it cross-fades. */
@@ -363,8 +381,7 @@ button:not(.fg-field):active {
   html .lv-dialog,
   html .lv-pop,
   html .lv-grid-days,
-  html .lv-months,
-  html .lv-guide-step {
+  html .lv-months {
     animation: none;
   }
 
@@ -1378,4 +1395,186 @@ textarea.lv-input {
 .lv-player input {
   flex: 1;
   accent-color: var(--lv-teal);
+}
+
+.lv-reel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #031c54;
+  font-family: var(--font-manrope, Manrope), sans-serif;
+}
+
+.lv-reel video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+}
+
+.lv-reel-tag,
+.lv-reel-time {
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+  pointer-events: none;
+}
+
+.lv-reel-tag {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  background: #fff;
+  color: #031c54;
+}
+
+.lv-reel-side {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.lv-reel-lang {
+  display: flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.lv-reel-lang button {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.lv-reel-lang button[lang="ml"] {
+  font-family: var(--font-noto-malayalam, "Noto Sans Malayalam"), sans-serif;
+}
+
+.lv-reel-lang button.on {
+  background: #fff;
+  color: #031c54;
+}
+
+.lv-reel-lang button:focus-visible {
+  outline: 2px solid #c7ffeb;
+  outline-offset: 1px;
+}
+
+.lv-reel-time {
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.lv-reel-play {
+  position: absolute;
+  left: 50%;
+  top: 294px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lv-reel-play:focus-visible,
+.lv-reel-bar:focus-visible {
+  outline: 2px solid #c7ffeb;
+  outline-offset: 2px;
+}
+
+.lv-reel-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 14px;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+}
+
+.lv-reel-bar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.lv-reel-bar i {
+  position: relative;
+  display: block;
+  height: 4px;
+  background: #fff;
+}
+
+.lv-reel-modal .lv-dialog {
+  width: min(720px, 100%);
+}
+
+.lv-reel-modal-body {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.lv-reel-modal-body .lv-reel {
+  flex: none;
+}
+
+.lv-reel-modal-body .lv-reel-play {
+  top: 50%;
+}
+
+.lv-reel-modal-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.lv-reel-modal-doc {
+  margin: 0;
+  font-weight: 700;
+  color: #031c54;
+}
+
+.lv-reel-modal-tags {
+  display: flex;
+  gap: 6px;
+}
+
+.lv-reel-modal-tags span {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #e6ecfb;
+  color: #031c54;
+  font-size: 13px;
+  font-weight: 600;
 }
