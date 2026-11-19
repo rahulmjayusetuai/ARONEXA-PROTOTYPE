@@ -59,6 +59,13 @@ const REWORD: Record<string, string> = {
     "Changing your registration number, council or HPR ID sets the check back to Pending.",
 };
 
+const ADD_CLINIC_SAMPLE: Record<string, string> = {
+  "IN32 1000 ...": "IN3210045678",
+  "e.g. Lakeshore Hospital": "Lakeshore Hospital",
+  "Building, street, area, city, PIN code": "NH 66, Maradu, Kochi, Ernakulam 682304",
+  "e.g. OPD 2, Room 11": "OPD 2, Room 11",
+};
+
 function reword(n: DesignNode) {
   const text = n.tx && REWORD[n.tx.v];
   if (n.tx && text) n.tx = { ...n.tx, v: text };
@@ -70,11 +77,14 @@ export function wire(doc: DesignNode, screenName: string) {
   reword(doc);
   // Patient screens have their own controls, which share labels with the doctor's. See patient.ts.
   // The other areas are wired by their own prototype links only.
-  if (/^(Patient web|PModal|PToast|Patient sign up|Login · (Patient|Pharmacy|Clinic staff|Lab|AroNexa team|Insurer|Dealer|Seller)|Pharmacy (web|register)|Ph(Modal|Toast)|Reception web|Rc(Modal|Toast)|ClinicAdmin web|Ca(Modal|Toast)|Lab web|Lb(Modal|Toast)|Pathologist web|Pa(Modal|Toast)|Rider|Platform web|Pl(Modal|Toast)|Support web|Sp(Modal|Toast)|(Insurer|Dealer|Seller) web|(In|Dl|Sl)(Modal|Toast))/.test(screenName)) return doc;
+  if (/^(Patient web|Patient mobile|PModal|PToast|Patient sign up|Login · (Patient|Pharmacy|Clinic staff|Lab|AroNexa team|Insurer|Dealer|Seller)|Pharmacy (web|register)|Ph(Modal|Toast)|Reception web|Rc(Modal|Toast)|ClinicAdmin web|Ca(Modal|Toast)|Lab web|Lb(Modal|Toast)|Pathologist web|Pa(Modal|Toast)|Rider|Platform web|Pl(Modal|Toast)|Support web|Sp(Modal|Toast)|(Insurer|Dealer|Seller) web|(In|Dl|Sl)(Modal|Toast))/.test(screenName)) return doc;
   let reviewEdit = 0;
   const walk = (n: DesignNode, parent?: DesignNode, inClick = false) => {
     // "Today's patients" filters in place, so this box is a real search field and not a pop-up link.
     if (n.n === "Search" && n.ch?.some((c) => c.tx?.v === "Search by name, phone or ID")) n.a = undefined;
+    // The add-clinic form starts filled with a sample clinic, so it can be saved straight away.
+    const sample = n.t === "T" && n.n === "Value" && parent?.n === "Input" ? ADD_CLINIC_SAMPLE[n.tx?.v ?? ""] : undefined;
+    if (sample && n.tx) n.tx = { ...n.tx, v: sample };
     const clicks = inClick || Boolean(HAS_ACTION(n));
     if (n.t === "T" && !clicks) {
       const v = n.tx?.v.trim() ?? "";

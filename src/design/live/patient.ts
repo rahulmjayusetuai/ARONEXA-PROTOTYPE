@@ -5,7 +5,7 @@ import { useLive } from "./state";
 type Live = ReturnType<typeof useLive.getState>;
 
 // Controls the patient screens draw but the design left unwired, plus the changes a patient's actions make.
-export const isPatientScreen = (name: string) => /^(Patient web|PModal|PToast|Patient sign up|Login · Patient)/.test(name);
+export const isPatientScreen = (name: string) => /^(Patient web|Patient mobile|PModal|PToast|Patient sign up|Login · Patient)/.test(name);
 
 const NAVY = "rgb(3,28,84)";
 const TEAL = "rgb(20,184,166)";
@@ -45,19 +45,28 @@ function pathTo(root: DesignNode, id: string): DesignNode[] | null {
   return null;
 }
 
+const bottomOf = (n: DesignNode) => Math.max(0, ...(n.ch ?? []).map((c) => c.y + c.h));
+
 // Everything below a removed or added row moves with it, up through its parents.
+// A parent never shrinks past its other content, so a short list doesn't cut off the panel beside it.
 function reflow(root: DesignNode, parent: DesignNode, from: number, delta: number) {
+  const path = pathTo(root, parent.id) ?? [parent];
+  const pads = path.map((p) => p.h - bottomOf(p));
   parent.ch?.forEach((c) => {
     if (c.y >= from) c.y += delta;
   });
-  const path = pathTo(root, parent.id) ?? [];
   parent.h += delta;
-  for (let i = path.length - 2; i >= 0; i--) {
+  let d = delta;
+  for (let i = path.length - 2; i >= 0 && d !== 0; i--) {
     const child = path[i + 1];
-    path[i].ch?.forEach((c) => {
-      if (c !== child && c.y >= child.y + child.h - delta) c.y += delta;
+    const p = path[i];
+    p.ch?.forEach((c) => {
+      if (c !== child && c.y >= child.y + child.h - d) c.y += d;
     });
-    path[i].h += delta;
+    let h = p.h + d;
+    if (d < 0) h = Math.max(h, bottomOf(p) + Math.max(pads[i], 0));
+    d = h - p.h;
+    p.h = h;
   }
 }
 
@@ -176,7 +185,32 @@ function onLeave(tile: DesignNode, text: DesignNode) {
   setWords(text, "On leave");
 }
 
+// Moving a booking that was already paid for costs nothing again.
+function rebookFree(root: DesignNode, live: Live) {
+  if (live.filters.rebook !== "1") return;
+  const set = (id: string, v: string) => {
+    const n = find(root, (x) => x.id === id);
+    if (n) setWords(n, v);
+  };
+  set("401:9189", "Paid");
+  const fee = find(root, (x) => x.id === "401:9189");
+  if (fee?.tx) {
+    fee.x = 238;
+    fee.w = 60;
+    fee.tx = { ...fee.tx, a: "RIGHT", r: "NONE" };
+  }
+  set("401:9192", "₹0");
+  set("401:9194", "Move my booking");
+  const label = find(root, (x) => x.id === "401:9194");
+  if (label?.tx) {
+    label.x = 0;
+    label.w = 298;
+    label.tx = { ...label.tx, a: "CENTER" };
+  }
+}
+
 function bookScreen(root: DesignNode, live: Live) {
+  rebookFree(root, live);
   const day = live.filters.bookDay || "Thu 29";
   const slot = live.filters.bookSlot || "11:00";
   const walk = (n: DesignNode) => {
@@ -384,6 +418,11 @@ function wireFindCare(root: DesignNode) {
     if (n.n === "Button / View profile" && !n.a) n.a = click("viewDoctor", place?.split(" ").slice(0, 3).join(" "));
     if (n.ch?.length === 1 && n.ch[0].tx?.v === "Search" && n.w <= 120) n.a = click("careSearch");
     if (n.tx?.v === "Clear" && !n.a) n.a = click("careClear");
+    // The area beside the search box is a dropdown of places.
+    if (parent && n.tx?.v === "Kakkanad, Kochi ▾" && !parent.a && parent.n !== "Input") {
+      parent.n = "Input";
+      n.n = "Value";
+    }
     // The design draws the search boxes as plain frames, so they become real fields.
     if (parent && n.tx && /^(Search doctor|Cardiologist$)/.test(n.tx.v) && parent.w >= 400 && parent.n !== "Input") {
       parent.n = "Input";
@@ -639,6 +678,22 @@ export function patientDoc(root: DesignNode, name: string, live: Live) {
   if (name === "PModal / Booked") {
     const when = find(root, (n) => n.tx?.v === "Thu 29 May · 11:00 AM");
     if (when) setWords(when, bookingWhen(live));
+    const paid = find(root, (n) => n.tx?.v === "Paid ₹20 by UPI · booking APT-58213");
+    const title = find(root, (n) => n.tx?.v === "Appointment booked");
+    if (live.filters.rebook === "1") {
+      if (paid) setWords(paid, "Nothing more to pay · booking APT-58213");
+      if (title) setWords(title, "Appointment moved");
+    }
+  }
+  if (name.startsWith("Patient web / My body")) {
+    // The allergy card opens the health profile, where allergies are listed, not Records & sharing.
+    const card = find(root, (n) => Boolean(n.a) && /^Allergy: Penicillin/.test(words(n).trim()) && n.a![0].acts[0]?.k === "nav");
+    if (card) card.a = [{ on: "click", acts: [{ k: "nav", to: "465:12656" }] }];
+  }
+  if (name === "Patient web / Settings") {
+    // The settings button on the settings page was linked to notifications; it stays on settings.
+    const gear = find(root, (n) => n.id === "463:13904");
+    if (gear) gear.a = [{ on: "click", acts: [{ k: "nav", to: "463:13204" }] }];
   }
   if (name === "Patient web / Lab tests") labOrders(root, live);
   if (name === "Patient web / Appointments") appointments(root, live);
@@ -686,6 +741,166 @@ const CART = "Patient web / Health store · Cart";
 const goTo = (screen: string) => click("goto", screen);
 const PAYING_WITH: Record<string, string> = { "Credit or debit card": "Card", "Net banking": "Net banking", "Pay on delivery": "On delivery", UPI: "UPI" };
 
+// The Health store's cart: what is in it, and how many of each.
+const STORE: Record<string, [price: number, line: string]> = {
+  "Digital BP monitor": [1799, "Upper-arm cuff · 1-year warranty"],
+  "Pulse oximeter": [1249, "Fingertip SpO₂ and pulse rate · 6-month warranty"],
+  "Glucometer with 25 strips": [899, "Result in 5 seconds · 1-year warranty"],
+  "Digital thermometer": [249, "Flexible tip · 6-month warranty"],
+  "Knee support brace": [599, "Adjustable fit · sizes M, L and XL"],
+  "Omega-3 fish oil, 60 capsules": [449, "1 capsule twice a day · expires Sep 2027"],
+  "Baby diapers, size M · 58 pcs": [899, "Up to 12 hours of dryness · ages 6–11 months"],
+  "Baby wipes · 72 pcs": [149, "Fragrance-free and alcohol-free"],
+  "Baby lotion · 200 ml": [249, "Gentle daily moisturiser · dermatologist tested"],
+  "Feeding bottle · 250 ml": [329, "BPA-free · anti-colic nipple"],
+  "Sanitary pads XL · 40 pads": [299, "Cotton-soft top layer · overnight protection"],
+  "Sanitary pads regular · 30 pads": [189, "Daytime protection · slim and breathable"],
+  "Panty liners · 60 pcs": [129, "Light flow and daily freshness"],
+  "Menstrual cup · medium": [399, "Reusable · medical-grade silicone"],
+};
+export const STORE_FEE = 49;
+export type CartLine = { name: string; qty: number };
+export const readCart = (text: string | undefined): CartLine[] =>
+  (text ?? "Digital BP monitor*1\nPulse oximeter*1")
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => ({ name: l.split("*")[0], qty: Number(l.split("*")[1]) || 1 }))
+    .filter((l) => STORE[l.name]);
+export const writeCart = (lines: CartLine[]) => lines.map((l) => `${l.name}*${l.qty}`).join("\n") || "empty";
+const rupees = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+
+// Which product a store button belongs to, from the card or row around it.
+function productFor(path: DesignNode[]) {
+  for (const p of [...path].reverse()) {
+    const m = /^(?:PProduct|Card|PRec|Product row) \/ (.+)$/.exec(p.n ?? "");
+    const named = m?.[1].split(" · Dr")[0].trim();
+    if (named && STORE[named]) return named;
+    const said = Object.keys(STORE).find((k) => words(p).trim().startsWith(k));
+    if (p.n === "Product row" && said) return said;
+  }
+  return "Digital BP monitor";
+}
+
+// Rebuilds a list drawn with the BP monitor and pulse oximeter, one row per item.
+function storeRows(root: DesignNode, lines: CartLine[], kind: "cart" | "list") {
+  const row = /^(Cart item|Review item|Order item|Line) \//;
+  const first = find(root, (n) => n.n === "Cart item / Digital BP monitor" || n.n === "Review item / Digital BP monitor" || n.n === "Order item / Digital BP monitor" || n.n === "Line / Digital BP monitor");
+  const holder = first && (pathTo(root, first.id) ?? []).at(-2);
+  const second = holder?.ch?.find((c) => row.test(c.n ?? "") && /Pulse oximeter$/.test(c.n ?? ""));
+  if (!first || !holder || !second) return;
+  const step = second.y - first.y;
+  const blockOf = (row: DesignNode) => holder.ch!.filter((c) => c.y >= row.y - 0.5 && c.y < row.y + step - 0.5);
+  const firstBlock = blockOf(first);
+  const secondBlock = blockOf(second);
+  const end = second.y + step;
+  holder.ch = holder.ch!.filter((c) => !firstBlock.includes(c) && !secondBlock.includes(c));
+  reflow(root, holder, end - 0.5, (Math.max(lines.length, 1) - 2) * step);
+  if (!lines.length) {
+    holder.ch.push({ id: "cart-empty", t: "T", x: first.x, y: first.y + 8, w: first.w, h: 24, p: solid("rgb(100,116,139)"), tx: { v: "Your cart is empty. Add something from the Health store.", s: 15, w: 500, r: "NONE" } });
+    return;
+  }
+  lines.forEach((line, i) => {
+    const pulse = line.name === "Pulse oximeter";
+    const model = pulse ? secondBlock : firstBlock;
+    const from = pulse ? second.y : first.y;
+    const [price, detail] = STORE[line.name];
+    const designed = pulse ? "Pulse oximeter" : "Digital BP monitor";
+    for (const part of model) {
+      const copy: DesignNode = JSON.parse(JSON.stringify(part));
+      const rename = (n: DesignNode) => {
+        n.id = `cart-${i}:${n.id}`;
+        n.ch?.forEach(rename);
+      };
+      rename(copy);
+      copy.y = part.y - from + first.y + i * step;
+      for (const t of texts(copy)) {
+        const v = t.tx!.v;
+        if (v === designed) setWords(t, line.name);
+        else if (v === `${designed} × 1`) setWords(t, `${line.name} × ${line.qty}`);
+        else if (v === STORE[designed][1]) setWords(t, detail);
+        else if (/^Qty: 1/.test(v)) setWords(t, v.replace("Qty: 1", `Qty: ${line.qty}`));
+        else if (/^₹[\d,]+$/.test(v)) {
+          setWords(t, rupees(price * line.qty));
+          const grow = Math.max(0, rupees(price * line.qty).length * 9 - t.w);
+          t.x -= grow;
+          t.w += grow;
+        }
+      }
+      const image = find(copy, (n) => n.n === "Image");
+      if (image && line.name !== designed) {
+        // Only the two designed products have photos; the others show their initials.
+        image.p = solid("rgb(241,245,249)");
+        image.ch = [{ id: `${image.id}:x`, t: "T", x: 0, y: 0, w: image.w, h: image.h, p: solid("rgb(100,116,139)"), tx: { v: line.name.split(/[ ,·]+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase(), s: Math.round(image.w / 4), w: 700, a: "CENTER", va: "CENTER", r: "NONE" } }];
+      }
+      if (kind === "cart") {
+        const stepper = find(copy, (n) => n.n === "Stepper");
+        stepper?.ch?.forEach((c) => {
+          const w = words(c).trim();
+          if (w === "−") c.a = click("cart", `dec|${line.name}`);
+          else if (w === "+") c.a = click("cart", `inc|${line.name}`);
+          else texts(c).forEach((t) => setWords(t, String(line.qty)));
+        });
+        for (const t of texts(copy)) {
+          if (t.tx!.v === "Delete") t.a = click("cart", `del|${line.name}`);
+          if (t.tx!.v === "Save for later") t.a = click("cart", `del|${line.name}|saved`);
+          if (t.tx!.v === "See more like this") t.a = goTo("Patient web / Health store");
+        }
+      }
+      holder.ch!.push(copy);
+    }
+  });
+}
+
+function storeCart(root: DesignNode, all: DesignNode[], name: string, live: Live) {
+  const cart = readCart(live.filters.cart);
+  const buying = live.filters.buyNow ? [{ name: live.filters.buyNow, qty: 1 }] : cart;
+  const placed = name.endsWith("Order placed");
+  const lines = placed ? readCart(live.filters.lastOrder ?? "Digital BP monitor*1\nPulse oximeter*1") : name.endsWith("Checkout") ? buying : cart;
+  const count = lines.reduce((s, l) => s + l.qty, 0);
+  const sub = lines.reduce((s, l) => s + STORE[l.name][0] * l.qty, 0);
+  const cartCount = cart.reduce((s, l) => s + l.qty, 0);
+  const cartTotal = cart.reduce((s, l) => s + STORE[l.name][0] * l.qty, 0);
+  // The store page's own cart box shows the cart; checkout and the order show what is being bought.
+  const shownCount = name === "Patient web / Health store" ? cartCount : count;
+  const shownSub = name === "Patient web / Health store" ? cartTotal : sub;
+  const fee = shownSub ? STORE_FEE : 0;
+  const swap: [RegExp, string][] = [
+    [/^View cart \(2\)$/, `View cart (${cartCount})`],
+    [/^Your cart \(2\)$/, `Your cart (${cartCount})`],
+    [/^Items \(2\)$/, `Items (${shownCount})`],
+    [/^Subtotal \(2 items\):$/, `Subtotal (${shownCount} item${shownCount === 1 ? "" : "s"}):`],
+    [/^Proceed to buy \(2 items\)$/, `Proceed to buy (${shownCount} item${shownCount === 1 ? "" : "s"})`],
+    [/· 2 items$/, `· ${shownCount} item${shownCount === 1 ? "" : "s"}`],
+    [/^2 items · /, `${shownCount} item${shownCount === 1 ? "" : "s"} · `],
+    [/^₹3,048$/, rupees(shownSub)],
+    [/^₹49$/, rupees(fee)],
+    [/^₹3,097$/, rupees(shownSub + fee)],
+    [/^Checkout · ₹3,097$/, `Checkout · ${rupees(shownSub + fee)}`],
+    [/^✓ Both items checked against your allergies$/, shownCount === 1 ? "✓ Checked against your allergies" : "✓ All items checked against your allergies"],
+  ];
+  for (const n of all) {
+    if (!n.tx) continue;
+    const hit = swap.find(([re]) => re.test(n.tx!.v));
+    if (hit) setWords(n, n.tx.v.replace(hit[0], hit[1]));
+  }
+  storeRows(root, lines, name.endsWith("Cart") ? "cart" : "list");
+  // Every add and buy button knows its product.
+  const walk = (n: DesignNode, path: DesignNode[]) => {
+    const w = /^Button \/ (Add to cart|Add|Buy now)/.exec(n.n ?? "")?.[1];
+    if (w && n.a?.[0]) {
+      const product = /^Button \/ Add (.+)$/.exec(n.n ?? "")?.[1]?.trim();
+      const item = product && STORE[product] ? product : productFor([...path, n]);
+      const op = w === "Buy now" ? "buy" : "add";
+      if (!n.a[0].acts.some((a) => a.k === "fx")) n.a = [{ ...n.a[0], acts: [{ k: "fx", fx: "cart", arg: `${op}|${item}` } as Action, ...n.a[0].acts] }];
+    }
+    if (/^Button \/ (Proceed to buy|Checkout)/.test(n.n ?? "") && n.a?.[0] && !n.a[0].acts.some((a) => a.k === "fx")) {
+      n.a = cartCount ? [{ ...n.a[0], acts: [{ k: "fx", fx: "cart", arg: "all|" } as Action, ...n.a[0].acts] }] : click("say", "Your cart is empty.");
+    }
+    n.ch?.forEach((c) => walk(c, [...path, n]));
+  };
+  walk(root, []);
+}
+
 function healthScreens(root: DesignNode, name: string, live: Live) {
   const all: DesignNode[] = [];
   const collect = (n: DesignNode) => {
@@ -700,7 +915,7 @@ function healthScreens(root: DesignNode, name: string, live: Live) {
 
   const ordered = live.filters.storeOrdered === "1" || name.endsWith("Order placed");
   const orders = [
-    ordered && "AH-2042 · BP monitor and pulse oximeter · arriving Fri, 20 Nov",
+    ordered && `AH-2042 · ${readCart(live.filters.lastOrder ?? "Digital BP monitor*1\nPulse oximeter*1").map((l) => `${l.name}${l.qty > 1 ? ` × ${l.qty}` : ""}`).join(", ")} · arriving Fri, 20 Nov`,
     "Digital thermometer · ₹249 · delivered 4 Nov",
     "Knee support brace · ₹599 · delivered 28 Oct",
     "Omega-3 fish oil · ₹449 · delivered 12 Oct",
@@ -712,7 +927,7 @@ function healthScreens(root: DesignNode, name: string, live: Live) {
     if (w === "View cart (2)" && n.a) n.a = goTo(CART);
     if (w === "My orders" && n.a) n.a = click("say", `Your orders: ${orders.join(". ")}.`);
     if (w === "Place your order" && n.a && !n.a[0].acts.some((x) => x.k === "fx")) {
-      n.a = [{ ...n.a[0], acts: [{ k: "fx", fx: "chipOne", arg: "storeOrdered|1" } as Action, ...n.a[0].acts] }];
+      n.a = [{ ...n.a[0], acts: [{ k: "fx", fx: "chipOne", arg: "storeOrdered|1" } as Action, { k: "fx", fx: "cart", arg: "order|" } as Action, ...n.a[0].acts] }];
     }
   }
 
@@ -759,7 +974,7 @@ function healthScreens(root: DesignNode, name: string, live: Live) {
 
   // Health store
   storeSearch(root, all, live);
-  named("Stepper").forEach((s) => s.ch?.forEach((c) => /^[−+]$/.test(words(c).trim()) && set(c, click("say", "Health devices are limited to one of each per order."))));
+  if (name.startsWith("Patient web / Health store") || name.startsWith("Patient web / Health hub")) storeCart(root, all, name, live);
   named("Button / Apply").forEach((n) => set(n, click("say", "No coupons are available for these items right now.")));
   named("Button / Verify").forEach((n) => set(n, click("say", "UPI ID verified: james.heatfield@upi")));
   named("Button / Track order").forEach((n) =>

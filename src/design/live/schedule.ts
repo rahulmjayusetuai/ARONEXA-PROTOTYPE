@@ -106,6 +106,9 @@ const POOL: P[] = [
   ["George Paul", "M, 70", "ANX-57311", "Phone call", "Heart failure review"],
 ];
 
+// Everyone the demo knows, for the top search.
+export const ALL_PATIENTS = [...TODAY_THANAL, ...POOL].map((p) => ({ name: p[0], who: p[1], pid: p[2] }));
+
 // The counts the design shows for May and June 2025. Other months follow the same weekly rhythm.
 const MAY = [8, 10, 4, 0, 6, 8, 10, 7, 9, 4, 0, 10, 7, 9, 9, 8, 4, 0, 9, 6, 8, 10, 8, 4, 0, 8, 10, 7, 9, 6, 4];
 const JUNE = [0, 10, 7, 9, 6, 8, 4, 0, 9, 6, 8, 10, 7, 4, 0, 8, 10, 7, 9, 6, 4, 0, 7, 9, 6, 8, 10, 4, 0, 6];

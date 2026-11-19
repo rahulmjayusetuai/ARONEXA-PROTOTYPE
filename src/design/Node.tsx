@@ -3,7 +3,7 @@
 import { memo, useEffect, useMemo, type CSSProperties, type ReactNode } from "react";
 import { BINDINGS } from "./bindings";
 import { acceptUpload } from "./live/actions";
-import { DateField, isDateText, optionsFor, SelectField } from "./live/Fields";
+import { DateField, isDateText, isMultiChoice, optionsFor, SelectField } from "./live/Fields";
 import { useLive } from "./live/state";
 import { LiveWidget } from "./live/Widgets";
 import { loaded, manifest, runActions, screensById, useDesign, warmActions } from "./store";
@@ -194,7 +194,7 @@ function FieldText({ node, parent, multiline }: { node: DesignNode; parent: Desi
     const clean = shown.replace(/\s*▾\s*$/, "");
     const options = optionsFor(original);
     if (options) {
-      return <SelectField value={clean} options={options} style={style} label={clean} onChange={(v) => setValue(node.id, v)} />;
+      return <SelectField value={clean} options={options} style={style} label={clean} multi={isMultiChoice(original)} caret={/▾\s*$/.test(original)} onChange={(v) => { setValue(node.id, v); setFilter(`select:${node.id}`, v); }} />;
     }
     if (isDateText(original) && !/\(same day\)/.test(original)) {
       return <DateField value={clean} style={style} label={clean} withDay={/^[A-Z][a-z]{2},/.test(original)} onChange={(v) => setValue(node.id, v)} />;
@@ -314,6 +314,7 @@ function Box({ node, parent, ancestors, overlay, smartMs }: Props & { smartMs?: 
     handlers.role = node.role ?? "button";
     handlers.tabIndex = 0;
     if (node.role === "checkbox") handlers["aria-checked"] = Boolean(node.pressed);
+    else if (node.pressed !== undefined) handlers["aria-pressed"] = node.pressed;
     handlers.onKeyDown = (e) => {
       if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
       e.preventDefault();
@@ -362,7 +363,7 @@ function Box({ node, parent, ancestors, overlay, smartMs }: Props & { smartMs?: 
 
   if (node.t === "T") {
     const tx = node.tx!;
-    const inputParent = parent?.n === "Input" && node.n === "Value";
+    const inputParent = parent?.n === "Input" && (node.n === "Value" || node.n === "Placeholder");
     const searchParent = parent?.n === "Search" && node.n === "Placeholder" && !parent.a?.length;
     if ((inputParent || searchParent) && parent && !parent.a?.length) {
       return <FieldText node={node} parent={parent} multiline={tx.r === "HEIGHT" && parent.h > 60} />;
