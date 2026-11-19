@@ -25,6 +25,12 @@ function useZoom() {
 
 const GUIDED: GuideArea[] = ["doctor", "patient", "pharmacy", "clinic", "lab"];
 
+// The partner area holds three portals, and each has its own guide.
+function partnerGuide(screenName: string): GuideArea | null {
+  const role = /^(Insurer|Dealer|Seller) web/.exec(screenName)?.[1];
+  return role ? (role.toLowerCase() as GuideArea) : null;
+}
+
 function screenFromPath(path: string) {
   const [area, slug] = path.split("/").filter(Boolean);
   const start = area === "patient" ? manifest.patientStart : (manifest.areas[area]?.start ?? manifest.start);
@@ -172,8 +178,8 @@ export function DesignApp({ path }: { path: string }) {
   const zoom = size && size.w < 600 ? Math.min(1, (fullZoom * 1440) / size.w) : fullZoom;
   if (!pageDoc || !size) return <div className="fg-loading">Loading…</div>;
   const area = screensById.get(screen)?.module ?? "doctor";
-  // Rider, team and partner have no guide video yet.
-  const guideArea = GUIDED.includes(area as GuideArea) ? (area as GuideArea) : null;
+  // Rider and team have no guide video yet.
+  const guideArea = area === "partner" ? partnerGuide(screensById.get(screen)?.name ?? "") : GUIDED.includes(area as GuideArea) ? (area as GuideArea) : null;
 
   return (
     <>
