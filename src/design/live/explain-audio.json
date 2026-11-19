@@ -1,0 +1,182 @@
+{
+ "Modal / video preview · heart tracing (ECG)": {
+  "file": "explain-heart-tracing-ecg",
+  "starts": [
+   0.35,
+   2.63,
+   16.51
+  ],
+  "length": 25.43
+ },
+ "Modal / video preview · heart scan (echo)": {
+  "file": "explain-heart-scan-echo",
+  "starts": [
+   0.35,
+   2.18,
+   14.18
+  ],
+  "length": 18.95
+ },
+ "Modal / video preview · chest X-ray": {
+  "file": "explain-chest-x-ray",
+  "starts": [
+   0.35,
+   2.06,
+   12.07
+  ],
+  "length": 16.84
+ },
+ "Modal / video preview · breathing test": {
+  "file": "explain-breathing-test",
+  "starts": [
+   0.35,
+   1.99,
+   11.74
+  ],
+  "length": 16.26
+ },
+ "Modal / video preview · brain MRI": {
+  "file": "explain-brain-mri",
+  "starts": [
+   0.35,
+   2.15,
+   11.99
+  ],
+  "length": 17.84
+ },
+ "Modal / video preview · liver scan": {
+  "file": "explain-liver-scan",
+  "starts": [
+   0.35,
+   1.91,
+   9.87
+  ],
+  "length": 16.27
+ },
+ "Modal / video preview · stomach breath test": {
+  "file": "explain-stomach-breath-test",
+  "starts": [
+   0.35,
+   2.34,
+   13.38
+  ],
+  "length": 19.93
+ },
+ "Modal / video preview · kidney scan": {
+  "file": "explain-kidney-scan",
+  "starts": [
+   0.35,
+   2.0,
+   7.67
+  ],
+  "length": 12.06
+ },
+ "Modal / video preview · knee X-ray": {
+  "file": "explain-knee-x-ray",
+  "starts": [
+   0.35,
+   1.9,
+   12.49
+  ],
+  "length": 16.24
+ },
+ "Modal / video preview · knee recovery": {
+  "file": "explain-knee-recovery",
+  "starts": [
+   0.35,
+   2.03,
+   13.06
+  ],
+  "length": 17.51
+ },
+ "Modal / video preview · chest X-ray (Malayalam)": {
+  "file": "explain-chest-x-ray-ml",
+  "starts": [
+   0.35,
+   2.82,
+   15.4
+  ],
+  "length": 20.83
+ },
+ "Modal / video preview · heart tracing (ECG) (Malayalam)": {
+  "file": "explain-heart-tracing-ecg-ml",
+  "starts": [
+   0.35,
+   3.93,
+   22.26
+  ],
+  "length": 34.0
+ },
+ "Modal / video preview · heart scan (echo) (Malayalam)": {
+  "file": "explain-heart-scan-echo-ml",
+  "starts": [
+   0.35,
+   3.14,
+   20.95
+  ],
+  "length": 26.81
+ },
+ "Modal / video preview · breathing test (Malayalam)": {
+  "file": "explain-breathing-test-ml",
+  "starts": [
+   0.35,
+   2.62,
+   17.32
+  ],
+  "length": 22.81
+ },
+ "Modal / video preview · brain MRI (Malayalam)": {
+  "file": "explain-brain-mri-ml",
+  "starts": [
+   0.35,
+   3.07,
+   15.65
+  ],
+  "length": 22.75
+ },
+ "Modal / video preview · liver scan (Malayalam)": {
+  "file": "explain-liver-scan-ml",
+  "starts": [
+   0.35,
+   2.49,
+   12.11
+  ],
+  "length": 20.43
+ },
+ "Modal / video preview · stomach breath test (Malayalam)": {
+  "file": "explain-stomach-breath-test-ml",
+  "starts": [
+   0.35,
+   3.14,
+   15.86
+  ],
+  "length": 25.33
+ },
+ "Modal / video preview · kidney scan (Malayalam)": {
+  "file": "explain-kidney-scan-ml",
+  "starts": [
+   0.35,
+   2.49,
+   9.83
+  ],
+  "length": 15.38
+ },
+ "Modal / video preview · knee X-ray (Malayalam)": {
+  "file": "explain-knee-x-ray-ml",
+  "starts": [
+   0.35,
+   2.77,
+   16.03
+  ],
+  "length": 20.37
+ },
+ "Modal / video preview · knee recovery (Malayalam)": {
+  "file": "explain-knee-recovery-ml",
+  "starts": [
+   0.35,
+   2.81,
+   17.11
+  ],
+  "length": 22.77
+ }
+}

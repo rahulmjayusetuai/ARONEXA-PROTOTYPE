@@ -124,8 +124,55 @@ function MeasureArea({ w, h }: { w: number; h: number }) {
   );
 }
 
-// Plays the explainer script aloud, with the bar moving through the 30 seconds.
+// Plays the explainer's narration, with the bar following the voice.
 function Player({ props, w }: { props: Record<string, unknown>; w: number }) {
+  if (props.src) return <NarrationPlayer src={props.src as string} length={props.length as number} w={w} />;
+  return <SpokenPlayer props={props} w={w} />;
+}
+
+function NarrationPlayer({ src, length, w }: { src: string; length: number; w: number }) {
+  const audio = useRef<HTMLAudioElement>(null);
+  const [at, setAt] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const toggle = () => {
+    const a = audio.current;
+    if (!a) return;
+    if (a.paused) void a.play().catch(() => undefined);
+    else a.pause();
+  };
+  const clockOf = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+  return (
+    <div className="lv-player" style={{ width: w }}>
+      <audio
+        ref={audio}
+        src={src}
+        preload="metadata"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setAt(0)}
+        onTimeUpdate={(e) => setAt(e.currentTarget.currentTime)}
+      />
+      <button type="button" aria-label={playing ? "Pause" : "Play"} onClick={toggle}>{playing ? "❚❚" : "▶"}</button>
+      <input
+        aria-label="Narration position"
+        type="range"
+        min={0}
+        max={length}
+        step={0.25}
+        value={at}
+        onChange={(e) => {
+          const t = Number(e.target.value);
+          setAt(t);
+          if (audio.current) audio.current.currentTime = t;
+        }}
+      />
+      <span>{clockOf(at)} / {clockOf(Math.round(length))}</span>
+    </div>
+  );
+}
+
+// Without a narrated track, the browser reads the script aloud while the bar moves through the 30 seconds.
+function SpokenPlayer({ props, w }: { props: Record<string, unknown>; w: number }) {
   const lines = (props.lines as string[]) ?? [];
   const [at, setAt] = useState(0);
   const [playing, setPlaying] = useState(false);
