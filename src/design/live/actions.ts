@@ -100,9 +100,10 @@ function submitForm(toastName: string, ctx: ActionContext): boolean {
     const added = live.allergies.find((a) => name.toLowerCase().includes(a.substance.toLowerCase().split(" ")[0]));
     if (PENICILLIN_GROUP.test(name)) return say(`Blocked: James is allergic to penicillin. Choose the suggested Azithromycin instead.`), false;
     if (added) return say(`Blocked: James has a recorded allergy to ${added.substance}.`), false;
+    // The prescription is issued to the patient; older layouts also picked a pharmacy.
     const pharmacy = formValue("211:4964", doc);
     live.add("meds", { id: newId(), name, dose: formValue("188:4570", doc), often: formValue("188:4575", doc), length: formValue("188:4580", doc), when: chipValue("189:4724", doc), pharmacy });
-    live.setText("toast:rx", pharmacy.split(",")[0]);
+    if (pharmacy) live.setText("toast:rx", pharmacy.split(",")[0]);
     return true;
   }
   if (toastName === "Toast / upload") {
@@ -634,6 +635,14 @@ function runFx(name: string, arg: string | undefined, ctx: ActionContext) {
     }
     case "pickUpload":
       return pickFile(".pdf,.jpg,.jpeg,.png", acceptUpload);
+    case "edit": {
+      // Opens a text in the design for editing: "nodeId|title|label|original text".
+      const [id, title, field, original] = (arg ?? "").split("|");
+      return live.openModal("value", { title, label: field, value: live.texts[id] ?? original, nodeId: id });
+    }
+    case "share":
+      void navigator.clipboard?.writeText(window.location.href).catch(() => undefined);
+      return say(arg ?? "Link copied.");
     case "useRx":
       useDesign.getState().setValue("188:4551", arg ?? "");
       return;

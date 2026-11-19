@@ -174,7 +174,7 @@ function FieldText({ node, parent, multiline }: { node: DesignNode; parent: Desi
     ["--ph" as string]: paintColor(node.p?.[0]),
   };
   const viewOnly = screen === "Doctor settings / Profile" || REGISTRATION_LOCKED.has(node.id);
-  const searchKey = placeholder && parent.n === "Search" ? "home" : undefined;
+  const searchKey = placeholder && parent.n === "Search" ? ((parent.props?.filterKey as string | undefined) ?? "home") : undefined;
   const common = {
     "aria-label": placeholder ? tx.v : tx.v,
     className: "fg-field",
