@@ -3,6 +3,7 @@ import { isPatientScreen, patientDoc } from "./patient";
 import { baseAppointments, collectedExtra, TODAY } from "./schedule";
 import { useLive } from "./state";
 import EXPLAIN_AUDIO from "./explain-audio.json";
+import manifest from "../manifest.json";
 
 type Live = ReturnType<typeof useLive.getState>;
 
@@ -534,7 +535,11 @@ function videoPlayer(root: DesignNode, name: string) {
   const audio = (EXPLAIN_AUDIO as Record<string, { file: string; starts: number[]; length: number }>)[name];
   if (audio) {
     // A narrated track in the patient's language. The storyboard's times follow the voice.
-    bar.props = { lines, src: `/video/${audio.file}.mp3`, length: audio.length };
+    // The same explainer in the other language is its own screen, so the switch moves to it.
+    const ml = name.endsWith(" (Malayalam)");
+    const otherName = ml ? name.slice(0, -" (Malayalam)".length) : `${name} (Malayalam)`;
+    const other = manifest.screens.find((s) => s.name === otherName)?.id;
+    bar.props = { lines, src: `/video/${audio.file}.mp3`, length: audio.length, lang: ml ? "ml" : "en", other };
     const clock = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
     const ends = [...audio.starts.slice(1), audio.length];
     let scene = 0;

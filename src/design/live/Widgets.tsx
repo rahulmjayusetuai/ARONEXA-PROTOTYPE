@@ -126,14 +126,31 @@ function MeasureArea({ w, h }: { w: number; h: number }) {
 
 // Plays the explainer's narration, with the bar following the voice.
 function Player({ props, w }: { props: Record<string, unknown>; w: number }) {
-  if (props.src) return <NarrationPlayer src={props.src as string} length={props.length as number} w={w} />;
+  if (props.src) return <NarrationPlayer src={props.src as string} length={props.length as number} lang={props.lang as "en" | "ml"} other={props.other as string | undefined} w={w} />;
   return <SpokenPlayer props={props} w={w} />;
 }
 
-function NarrationPlayer({ src, length, w }: { src: string; length: number; w: number }) {
+// Set when the patient switches language mid-way, so the other language's narration carries on playing.
+const narrationResume = { pending: false };
+const resumeNarration = (on: boolean) => {
+  narrationResume.pending = on;
+};
+
+function NarrationPlayer({ src, length, lang, other, w }: { src: string; length: number; lang: "en" | "ml"; other?: string; w: number }) {
   const audio = useRef<HTMLAudioElement>(null);
   const [at, setAt] = useState(0);
   const [playing, setPlaying] = useState(false);
+  useEffect(() => {
+    if (!narrationResume.pending) return;
+    resumeNarration(false);
+    void audio.current?.play().catch(() => undefined);
+  }, []);
+  const switchLanguage = (code: "en" | "ml") => {
+    if (code === lang || !other) return;
+    resumeNarration(Boolean(audio.current && !audio.current.paused));
+    audio.current?.pause();
+    runActions([{ k: useDesign.getState().overlays.length ? "swap" : "nav", to: other }], []);
+  };
   const toggle = () => {
     const a = audio.current;
     if (!a) return;
@@ -167,6 +184,15 @@ function NarrationPlayer({ src, length, w }: { src: string; length: number; w: n
         }}
       />
       <span>{clockOf(at)} / {clockOf(Math.round(length))}</span>
+      {other && (
+        <div className="lv-lang" role="group" aria-label="Narration language">
+          {(["en", "ml"] as const).map((code) => (
+            <button key={code} type="button" lang={code} aria-pressed={lang === code} className={lang === code ? "on" : undefined} onClick={() => switchLanguage(code)}>
+              {code === "en" ? "English" : "മലയാളം"}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

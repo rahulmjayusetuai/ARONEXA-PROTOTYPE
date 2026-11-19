@@ -81,7 +81,7 @@ export function Guide({ area, entered }: { area: Area; entered: boolean }) {
       </button>
     ) : null;
   const { title, sub } = VIDEO[area];
-  const bilingual = area !== "doctor";
+  const bilingual = true;
   const file = bilingual && lang === "ml" ? `${area}-ml` : area;
   const pick = (next: "en" | "ml") => {
     if (next === lang) return;
