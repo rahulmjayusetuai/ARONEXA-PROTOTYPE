@@ -77,7 +77,7 @@ export function wire(doc: DesignNode, screenName: string) {
   reword(doc);
   // Patient screens have their own controls, which share labels with the doctor's. See patient.ts.
   // The other areas are wired by their own prototype links only.
-  if (/^(Patient web|Patient mobile|PModal|PToast|Patient sign up|Login · (Patient|Pharmacy|Clinic staff|Lab|AroNexa team|Insurer|Dealer|Seller)|Pharmacy (web|register)|Ph(Modal|Toast)|Reception web|Rc(Modal|Toast)|ClinicAdmin web|Ca(Modal|Toast)|Lab web|Lb(Modal|Toast)|Pathologist web|Pa(Modal|Toast)|Rider|Platform web|Pl(Modal|Toast)|Support web|Sp(Modal|Toast)|(Insurer|Dealer|Seller) web|(In|Dl|Sl)(Modal|Toast))/.test(screenName)) return doc;
+  if (/^(Patient web|Patient mobile|PModal|PToast|Patient sign up|Login · (Patient|Pharmacy|Clinic staff|Lab|AroNexa team|Insurer|Dealer|Seller)|Pharmacy (web|register)|Lab register|Clinic invite|Ph(Modal|Toast)|Reception web|Rc(Modal|Toast)|ClinicAdmin web|Ca(Modal|Toast)|Lab web|Lb(Modal|Toast)|Pathologist web|Pa(Modal|Toast)|Rider|Platform web|Pl(Modal|Toast)|Support web|Sp(Modal|Toast)|(Insurer|Dealer|Seller) web|(In|Dl|Sl)(Modal|Toast))/.test(screenName)) return doc;
   let reviewEdit = 0;
   const walk = (n: DesignNode, parent?: DesignNode, inClick = false) => {
     // "Today's patients" filters in place, so this box is a real search field and not a pop-up link.

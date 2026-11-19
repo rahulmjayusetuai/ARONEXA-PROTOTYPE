@@ -195,7 +195,7 @@ export function DesignApp({ path }: { path: string }) {
       {guideArea && (
         <Guide
           area={guideArea}
-          entered={!/^(Login|Register|Patient sign up|Pharmacy register)/.test(screensById.get(screen)?.name ?? "")}
+          entered={!/^(Login|Register|Patient sign up|Pharmacy register|Lab register|Clinic invite)/.test(screensById.get(screen)?.name ?? "")}
         />
       )}
       {notice && <div className="fg-notice" role="status">{notice}</div>}
