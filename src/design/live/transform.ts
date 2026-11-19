@@ -1,4 +1,4 @@
-import type { DesignNode } from "../types";
+import type { Action, DesignNode } from "../types";
 import { isPatientScreen, patientDoc } from "./patient";
 import { ALL_PATIENTS, baseAppointments, collectedExtra, TODAY } from "./schedule";
 import { readQuestions, useLive } from "./state";
@@ -637,9 +637,9 @@ function scanDetail(root: DesignNode, name: string, live: Live) {
 }
 
 // Booking the lipid profile on Lab tests: pick the lab and collection, pay, and the test shows as booked.
-const LIPID_LABS: Record<string, { card: string; total: string; when: string }> = {
-  Thejus: { card: "402:9273", total: "₹525", when: "Thejus Clinical Lab · tomorrow 7 to 8 AM" },
-  Nila: { card: "402:9278", total: "₹585", when: "Nila Diagnostics · tomorrow 9 to 10 AM" },
+const LIPID_LABS: Record<string, { card: string; total: string; when: string; slot: string }> = {
+  Thejus: { card: "402:9273", total: "₹525", when: "Thejus Clinical Lab · tomorrow 7 to 8 AM", slot: "Tomorrow 7 to 8 AM" },
+  Nila: { card: "402:9278", total: "₹585", when: "Nila Diagnostics · tomorrow 9 to 10 AM", slot: "Tomorrow 9 to 10 AM" },
 };
 
 function lipidBooking(root: DesignNode, live: Live) {
@@ -657,6 +657,8 @@ function lipidBooking(root: DesignNode, live: Live) {
   if (where.length === 2) chipStyles(where, "labWhere", live);
   const total = byId("402:9292");
   if (total?.tx) total.tx = { ...total.tx, v: LIPID_LABS[choice].total };
+  const slot = findNode(root, (n) => n.n === "Collection slot");
+  if (slot?.tx) slot.tx = { ...slot.tx, v: LIPID_LABS[choice].slot };
   const pay = byId("402:9293");
   const payLabel = byId("402:9294");
   const booked = live.filters.lipidBooked === "1";
@@ -687,6 +689,33 @@ function lipidBooking(root: DesignNode, live: Live) {
   const book = byId("402:9190");
   const row = book && pathTo(root, book.id)?.at(-2);
   if (row) row.ch = row.ch?.filter((c) => c !== book);
+}
+
+// Compare lab quotes: the chosen lab's card is outlined and its button reads "Continue with …", which goes on to
+// the booking box on Lab tests. The other lab's "Choose …" only moves the choice.
+const QUOTE_ON = { p: { k: "s", c: "rgb(20,184,166)" }, w: 3, a: "INSIDE" };
+const QUOTE_OFF = { p: { k: "s", c: "rgb(226,232,240)" }, w: 1, a: "INSIDE" };
+
+function labQuotes(root: DesignNode, live: Live) {
+  const choice = live.filters.labChoice === "Nila" ? "Nila" : "Thejus";
+  const cards: Record<string, string> = { Thejus: "Quote / Thejus Clinical Lab", Nila: "Quote / Nila Diagnostics" };
+  for (const [lab, cardName] of Object.entries(cards)) {
+    const card = findNode(root, (n) => n.n === cardName);
+    const button = card && findNode(card, (n) => n.n === `Button / Choose ${lab}`);
+    const label = button && findNode(button, (n) => Boolean(n.tx));
+    if (!card || !button || !label?.tx) continue;
+    const on = lab === choice;
+    card.k = (on ? QUOTE_ON : QUOTE_OFF) as DesignNode["k"];
+    button.p = [{ k: "s", c: on ? "rgb(3,28,84)" : "rgb(255,255,255)" }] as DesignNode["p"];
+    button.k = (on ? undefined : { p: { k: "s", c: "rgb(203,213,225)" }, w: 1, a: "INSIDE" }) as DesignNode["k"];
+    label.tx = { ...label.tx, v: on ? `Continue with ${lab}` : `Choose ${lab}`, a: "CENTER" };
+    label.p = [{ k: "s", c: on ? "rgb(255,255,255)" : "rgb(3,28,84)" }] as DesignNode["p"];
+    label.x = 0;
+    label.w = button.w;
+    const pick: Action = { k: "fx", fx: "pick", arg: `labChoice|${lab}|one|` };
+    const onward = button.a?.[0]?.acts.filter((a) => a.k === "nav") ?? [];
+    button.a = [{ on: "click", acts: on ? [pick, ...onward] : [pick, { k: "fx", fx: "say", arg: `${lab === "Nila" ? "Nila Diagnostics" : "Thejus Clinical Lab"} chosen. Press Continue to book.` }] }];
+  }
 }
 
 // The status chips on "My reports and scans" narrow the cards, which then close up in the grid.
@@ -1204,13 +1233,7 @@ export function liveDoc(doc: DesignNode, name: string, live: Live) {
   if (isPatientScreen(name)) patientDoc(root, name, live);
   if (name.startsWith("Patient web / Reports & scans")) reportStatus(root, live);
   if (name === "Patient web / Lab tests") lipidBooking(root, live);
-  if (name.startsWith("Patient web / Compare lab quotes")) {
-    // Choosing a lab carries the choice to the booking box on Lab tests.
-    for (const lab of ["Thejus", "Nila"]) {
-      const button = findNode(root, (n) => n.n === `Button / Choose ${lab}`);
-      if (button?.a) button.a = [{ on: "click", acts: [{ k: "fx", fx: "pick", arg: `labChoice|${lab}|one|` }, ...button.a[0].acts] }];
-    }
-  }
+  if (name.startsWith("Patient web / Compare lab quotes")) labQuotes(root, live);
   if (name === "PModal / Running late") {
     // The patient picks how late they will be.
     const row = findNode(root, (n) => n.n === "Row" && (n.ch?.length ?? 0) === 4);
