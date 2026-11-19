@@ -669,6 +669,17 @@ const REEL_VIDEOS: Record<string, { file: string; was: string; length: string }>
   "Slow breathing: 2 minutes for BP": { file: "breathing", was: "1:05", length: "1:09" },
   "Taking BP tablets the right way": { file: "tablets", was: "0:40", length: "0:34" },
 };
+// The hub's other videos, which play in a pop-up because the design has no viewer page for them.
+const MORE_VIDEOS: Record<string, { file: string; was: string; length: string }> = {
+  "Does drinking water lower BP?": { file: "water", was: "0:35", length: "0:39" },
+  "3 easy exercises for high BP": { file: "exercises", was: "0:58", length: "0:49" },
+  "Myth: BP tablets are for life?": { file: "myth-tablets", was: "0:44", length: "0:41" },
+  "Banana, potassium and your BP": { file: "potassium", was: "0:49", length: "0:38" },
+  "3 moves to strengthen your knee": { file: "knee-moves", was: "0:55", length: "0:44" },
+  "Stairs and knee pain: dos and don’ts": { file: "stairs", was: "0:47", length: "0:32" },
+  "Knee brace: when does it help?": { file: "knee-brace", was: "0:41", length: "0:37" },
+  "Walking with knee pain": { file: "knee-walk", was: "1:02", length: "0:45" },
+};
 const HUB_SORTS = ["Most viewed", "Shortest first"];
 const BOOK_FROM_HUB = "Patient web / Book appointment · from Health Hub";
 const CART = "Patient web / Health store · Cart";
@@ -719,10 +730,15 @@ function healthScreens(root: DesignNode, name: string, live: Live) {
     set(row, /BP monitor/.test(words(row)) ? goTo("Patient web / Health store · Digital BP monitor") : goTo("Patient web / Health store"));
   });
   reelVideos(all);
-  // Only the four videos from the patient's doctor have been made; the other cards say so instead of doing nothing.
+  // The hub's other cards open their video in a pop-up player.
   all.filter((n) => n.cid === "832:15188" && !n.a).forEach((card) => {
-    const title = [...texts(card)].sort((a, b) => (b.tx!.s ?? 0) - (a.tx!.s ?? 0))[0]?.tx!.v;
-    card.a = click("say", `“${title}” is coming soon. For now, watch the videos from your doctor.`);
+    const lines = texts(card).map((t) => t.tx!.v);
+    const title = Object.keys(MORE_VIDEOS).find((t) => lines.includes(t));
+    if (!title) return;
+    const doctor = lines.find((l) => l.startsWith("Dr. ")) ?? "";
+    const role = lines.find((l) => / views$/.test(l)) ?? "";
+    const file = MORE_VIDEOS[title].file;
+    card.a = click("reel", JSON.stringify({ title, doctor, role, tag: lines[0], topic: lines.find((l) => l === "Hypertension" || l === "Knee pain") ?? "", file }));
   });
   hubSort(all, live);
   hubFilter(root, all, live);
@@ -888,20 +904,21 @@ function hubFilter(root: DesignNode, all: DesignNode[], live: Live) {
 
 // Each of the doctor's video cards plays its real video, and every card and list shows its real length.
 function reelVideos(all: DesignNode[]) {
-  const titleIn = (n: DesignNode) => Object.keys(REEL_VIDEOS).find((t) => texts(n).some((x) => x.tx?.v === t));
+  const lengths = { ...REEL_VIDEOS, ...MORE_VIDEOS };
+  const titleIn = (n: DesignNode) => Object.keys(lengths).find((t) => texts(n).some((x) => x.tx?.v === t));
   let first = true;
   for (const n of all) {
     if (n.t === "T" || !n.ch) continue;
     const title = titleIn(n);
     if (!title) continue;
-    const video = REEL_VIDEOS[title];
+    const video = lengths[title];
     const isCard = n.cid === "832:15188" || n.n?.startsWith("Next / ");
     if (isCard) {
       texts(n).forEach((t) => {
         if (t.tx && t.tx.v.endsWith(video.was)) setWords(t, t.tx.v.slice(0, -video.was.length) + video.length);
       });
     }
-    if (n.n === "Video" && n.p?.some((p) => p.k === "i")) {
+    if (n.n === "Video" && n.p?.some((p) => p.k === "i") && REEL_VIDEOS[title]) {
       const tag = find(n, (c) => c.n === "Tag");
       const play = find(n, (c) => c.n === "Play");
       n.ch = [{

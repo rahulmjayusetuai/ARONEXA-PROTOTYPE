@@ -6,6 +6,9 @@ import { exportSource, printBlocks, writeCsv, writePdf, type Block } from "./exp
 import { DateGrid, optionsFor, SelectField } from "./Fields";
 import { baseAppointments, fieldDate, MONTHS, minutes, plainDate, TIME_OPTIONS, TODAY, type Appt } from "./schedule";
 import { newId, useLive } from "./state";
+import { ReelPlayer } from "./Widgets";
+import { runActions } from "../store";
+import type { Action } from "../types";
 
 export function Dialog({ title, sub, children, foot, onClose, className }: { title: string; sub?: string; children: ReactNode; foot?: ReactNode; onClose: () => void; className?: string }) {
   return (
@@ -527,6 +530,32 @@ function Attach({ close }: { close: () => void }) {
   );
 }
 
+type Reel = { title: string; doctor: string; role: string; tag: string; topic: string; file: string };
+
+// A Health hub video with no viewer page of its own, played in a pop-up.
+function ReelModal({ title, doctor, role, tag, topic, file, close }: Reel & { close: () => void }) {
+  const askDoctor = () => {
+    close();
+    runActions([{ k: "fx", fx: "goto", arg: "Patient web / Book appointment · from Health Hub" } as Action], []);
+  };
+  return (
+    <Dialog title={title} sub={`${doctor} · ${role.replace(/ · .*$/, "")}`} onClose={close} className="lv-reel-modal" foot={<>
+      <button type="button" className="lv-btn" onClick={() => say("Saved to your videos.")}>Save</button>
+      <button type="button" className="lv-btn lv-btn-dark" onClick={askDoctor}>Ask a doctor</button>
+    </>}>
+      <div className="lv-reel-modal-body">
+        <ReelPlayer props={{ src: `/video/reel-${file}.mp4`, poster: `/video/reel-${file}.jpg`, captions: `/video/reel-${file}.vtt`, title, tag, first: true }} w={320} h={547} />
+        <div className="lv-reel-modal-info">
+          <p className="lv-reel-modal-doc">✓ {doctor}</p>
+          <p className="lv-help">{role}</p>
+          <div className="lv-reel-modal-tags">{[tag, topic].filter(Boolean).map((t) => <span key={t}>{t}</span>)}</div>
+          <p className="lv-help">Educational content · Not a substitute for a consultation. Talk to your doctor before changing your treatment.</p>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
 export function LiveModals() {
   const modal = useLive((s) => s.modal);
   const close = useLive((s) => s.closeModal);
@@ -578,6 +607,8 @@ export function LiveModals() {
       return <Confirm {...(p as { title: string })} close={close} />;
     case "attach":
       return <Attach close={close} />;
+    case "reel":
+      return <ReelModal {...(p as Reel)} close={close} />;
     default:
       return null;
   }

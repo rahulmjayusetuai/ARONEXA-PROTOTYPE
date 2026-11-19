@@ -247,7 +247,7 @@ function VideoPlayer({ props, w, h }: { props: Record<string, unknown>; w: numbe
 }
 
 // A Health hub video. It plays while it's on screen and pauses when the patient scrolls past it, like a reel.
-function ReelPlayer({ props, w, h }: { props: Record<string, unknown>; w: number; h: number }) {
+export function ReelPlayer({ props, w, h }: { props: Record<string, unknown>; w: number; h: number }) {
   const box = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const [at, setAt] = useState(0);
@@ -295,7 +295,7 @@ function ReelPlayer({ props, w, h }: { props: Record<string, unknown>; w: number
         <track kind="captions" src={props.captions as string} srcLang="en" label="English" />
       </video>
       {props.tag ? <span className="lv-reel-tag">{props.tag as string}</span> : null}
-      {length ? <span className="lv-reel-time">{playing || at ? clock(left) : clock(length)}</span> : null}
+      {length ? <span className="lv-reel-time">{playing || at ? clock(left) : clock(Math.round(length))}</span> : null}
       {!playing && (
         <button type="button" className="lv-reel-play" aria-label={ended ? "Play again" : "Play"} onClick={toggle}>
           {/* eslint-disable-next-line @next/next/no-img-element -- a small design icon, like the rest of the screens */}

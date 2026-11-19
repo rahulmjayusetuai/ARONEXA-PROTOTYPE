@@ -640,6 +640,8 @@ function runFx(name: string, arg: string | undefined, ctx: ActionContext) {
       const [id, title, field, original] = (arg ?? "").split("|");
       return live.openModal("value", { title, label: field, value: live.texts[id] ?? original, nodeId: id });
     }
+    case "reel":
+      return live.openModal("reel", JSON.parse(arg ?? "{}") as Record<string, unknown>);
     case "share":
       void navigator.clipboard?.writeText(window.location.href).catch(() => undefined);
       return say(arg ?? "Link copied.");

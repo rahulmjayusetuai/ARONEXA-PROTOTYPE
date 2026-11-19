@@ -1490,3 +1490,48 @@ textarea.lv-input {
   height: 4px;
   background: #fff;
 }
+
+.lv-reel-modal .lv-dialog {
+  width: min(720px, 100%);
+}
+
+.lv-reel-modal-body {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.lv-reel-modal-body .lv-reel {
+  flex: none;
+}
+
+.lv-reel-modal-body .lv-reel-play {
+  top: 50%;
+}
+
+.lv-reel-modal-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.lv-reel-modal-doc {
+  margin: 0;
+  font-weight: 700;
+  color: #031c54;
+}
+
+.lv-reel-modal-tags {
+  display: flex;
+  gap: 6px;
+}
+
+.lv-reel-modal-tags span {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #e6ecfb;
+  color: #031c54;
+  font-size: 13px;
+  font-weight: 600;
+}
