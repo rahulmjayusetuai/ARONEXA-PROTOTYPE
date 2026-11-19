@@ -3,7 +3,7 @@
 import { calendarReturn, goTo, load, loaded, manifest, screensById, useDesign } from "../store";
 import type { Action, DesignNode } from "../types";
 import { blocksFrom, exportSource, printBlocks, writePdf } from "./export";
-import { bookingWhen, readCart, slotProblem, writeCart } from "./patient";
+import { bookingWhen, readCart, slotProblem, videoTitles, writeCart } from "./patient";
 import { liveDoc, scanOrganOf, TIMELINE_TYPES, timelineScreen } from "./transform";
 import { TODAY } from "./schedule";
 import { newId, useLive } from "./state";
@@ -358,6 +358,27 @@ let narration: HTMLAudioElement | null = null;
 const NARRATED: [RegExp, string][] = [[/heart tracing \(ECG\)/, "/video/explain-heart-tracing-ecg.mp3"]];
 
 // The recording for the card around a Listen button: the nearest enclosing card that names a narrated report.
+// The Health hub video whose panel holds this button, if any.
+function videoNear(node?: DesignNode) {
+  const root = screenDoc();
+  if (!node || !root) return undefined;
+  const path: DesignNode[] = [];
+  const walk = (n: DesignNode): boolean => {
+    path.push(n);
+    if (n.id === node.id || n.ch?.some(walk)) return true;
+    path.pop();
+    return false;
+  };
+  if (!walk(root)) return undefined;
+  const titles = videoTitles();
+  for (const box of [...path].reverse().slice(1, 6)) {
+    const text = collectText(box);
+    const title = titles.find((t) => text.includes(t));
+    if (title) return title;
+  }
+  return undefined;
+}
+
 function narrationFor(node?: DesignNode) {
   const root = screenDoc();
   if (!node || !root) return undefined;
@@ -446,7 +467,7 @@ function patientAction(dest: string, ctx: ActionContext): boolean {
       // The question is written first; the design's "Question sent" message follows.
       if (ctx.overlay === undefined) {
         const page = screenName().replace(/^Patient web \/ /, "");
-        live.openModal("ask", { about: page });
+        live.openModal("ask", { about: videoNear(ctx.node) ?? page });
         return true;
       }
       return false;
@@ -815,6 +836,8 @@ function runFx(name: string, arg: string | undefined, ctx: ActionContext) {
       const [id, title, field, original] = (arg ?? "").split("|");
       return live.openModal("value", { title, label: field, value: live.texts[id] ?? original, nodeId: id });
     }
+    case "questions":
+      return live.openModal("questions");
     case "reel":
       return live.openModal("reel", JSON.parse(arg ?? "{}") as Record<string, unknown>);
     case "share":

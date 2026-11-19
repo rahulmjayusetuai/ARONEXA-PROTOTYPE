@@ -945,6 +945,51 @@ html.fg-dark .lv-photo {
   color: #1e3a8a;
 }
 
+.lv-question {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.lv-question header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lv-question header .lv-pill {
+  margin-left: auto;
+}
+
+.lv-question-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #0f172a;
+}
+
+.lv-question-reply {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  font-size: 14px;
+  color: #065f46;
+}
+
+.lv-question-form {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.lv-question-form textarea {
+  flex: 1;
+}
+
 .lv-pill-leave,
 .lv-pill-amber {
   background: #ffedd5;

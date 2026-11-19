@@ -108,7 +108,18 @@ export const useLive = create<State>((set) => ({
 }));
 
 // Patient-side results that have to survive a reload and reach the doctor's tab.
-const KEPT_FILTER = /^(bookings|cancelled|billPaid|familyAdded|uploads|profile|pick:)/;
+const KEPT_FILTER = /^(bookings|cancelled|billPaid|familyAdded|uploads|profile|questions|pick:)/;
+
+// A patient's question to their doctor, from "Ask my doctor". Kept as JSON in the "questions" filter.
+export type Question = { id: string; about: string; text: string; at: string; read?: boolean; reply?: string };
+export const readQuestions = (text: string | undefined): Question[] => {
+  try {
+    const list = JSON.parse(text ?? "[]");
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+};
 
 function snapshot(s: State) {
   const { blocks, leaves, walkIns, allergies, events, docs, meds, orders, collected, texts, hidden, checks, photo, theme, billingRange, attachments, seenTokens, filters } = s;

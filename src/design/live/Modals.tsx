@@ -5,7 +5,7 @@ import { say, toast, type ActionContext } from "./actions";
 import { exportSource, printBlocks, writeCsv, writePdf, type Block } from "./export";
 import { DateGrid, optionsFor, SelectField } from "./Fields";
 import { baseAppointments, fieldDate, MONTHS, minutes, plainDate, TIME_OPTIONS, TODAY, type Appt } from "./schedule";
-import { newId, useLive } from "./state";
+import { newId, readQuestions, useLive } from "./state";
 import { ReelPlayer } from "./Widgets";
 import { runActions, useDesign } from "../store";
 import type { Action } from "../types";
@@ -418,6 +418,11 @@ function AskDoctor({ about, close }: { about: string; close: () => void }) {
   const [error, setError] = useState(false);
   const send = () => {
     if (!text.trim()) return setError(true);
+    // Saved where the doctor's tab can see it, on the Messages card of the doctor's Home.
+    const live = useLive.getState();
+    const at = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
+    const question = { id: newId(), about: about.replace(/^My body · /, ""), text: text.trim(), at };
+    live.setFilter("questions", JSON.stringify([question, ...readQuestions(live.filters.questions)]));
     close();
     toast("PToast / ask");
   };
@@ -431,6 +436,64 @@ function AskDoctor({ about, close }: { about: string; close: () => void }) {
       <p className="lv-help">Your doctor sees your records with it. For anything urgent, use Emergency.</p>
     </Dialog>
   );
+}
+
+// The doctor reads the patients' questions from the Messages card on Home, and can reply.
+function PatientQuestions({ close }: { close: () => void }) {
+  const raw = useLive((s) => s.filters.questions);
+  const setFilter = useLive((s) => s.setFilter);
+  const questions = readQuestions(raw);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const save = (next: typeof questions) => setFilter("questions", JSON.stringify(next));
+  useEffect(() => {
+    const list = readQuestions(useLive.getState().filters.questions);
+    if (list.some((q) => !q.read)) useLive.getState().setFilter("questions", JSON.stringify(list.map((q) => ({ ...q, read: true }))));
+  }, []);
+  const reply = (id: string) => {
+    const text = drafts[id]?.trim();
+    if (!text) return say("Write a reply first.");
+    save(questions.map((q) => (q.id === id ? { ...q, reply: text, read: true } : q)));
+    setDrafts((d) => ({ ...d, [id]: "" }));
+    say("Reply sent to James Heatfield in the AroNexa app.");
+  };
+  return (
+    <Dialog title="Questions from patients" sub={`${questions.length} from the patient app · newest first`} onClose={close} className="lv-questions" foot={<button type="button" className="lv-btn lv-btn-dark" onClick={close}>Done</button>}>
+      {questions.map((q) => (
+        <article key={q.id} className="lv-question">
+          <header>
+            <b>James Heatfield</b>
+            <span className="lv-help">ANX-78291 · {q.at}</span>
+            {q.reply ? <i className="lv-pill lv-pill-now">Replied</i> : <i className="lv-pill lv-pill-amber">Waiting for reply</i>}
+          </header>
+          {q.about && <p className="lv-help">About: {q.about}</p>}
+          <p className="lv-question-text">{q.text}</p>
+          {q.reply ? (
+            <p className="lv-question-reply"><b>Your reply:</b> {q.reply}</p>
+          ) : (
+            <div className="lv-question-form">
+              <textarea rows={2} className="lv-input" aria-label={`Reply to James Heatfield about ${q.about || "their question"}`} placeholder="Write a reply…" value={drafts[q.id] ?? ""} onChange={(e) => setDrafts((d) => ({ ...d, [q.id]: e.target.value }))} />
+              <button type="button" className="lv-btn lv-btn-dark" onClick={() => reply(q.id)}>Send reply</button>
+            </div>
+          )}
+        </article>
+      ))}
+    </Dialog>
+  );
+}
+
+// On the doctor's side, a question sent from the patient's tab shows a short notice as it arrives.
+function useQuestionNotice() {
+  useEffect(() => {
+    let count = readQuestions(useLive.getState().filters.questions).length;
+    return useLive.subscribe((s) => {
+      const list = readQuestions(s.filters.questions);
+      const arrived = list.length > count;
+      count = list.length;
+      if (!arrived || !window.location.pathname.startsWith("/doctor")) return;
+      const about = list[0].about ? ` about “${list[0].about}”` : "";
+      say(`New question from James Heatfield${about}. Open Messages on Home to read it.`);
+    });
+  }, []);
 }
 
 function FindClinic({ close }: { close: () => void }) {
@@ -582,6 +645,7 @@ function ReelModal({ title, doctor, role, tag, topic, file, close }: Reel & { cl
 export function LiveModals() {
   const modal = useLive((s) => s.modal);
   const close = useLive((s) => s.closeModal);
+  useQuestionNotice();
   useEffect(() => {
     if (!modal) return;
     const key = (e: KeyboardEvent) => {
@@ -620,6 +684,8 @@ export function LiveModals() {
       return <Selfie close={close} />;
     case "findClinic":
       return <FindClinic close={close} />;
+    case "questions":
+      return <PatientQuestions close={close} />;
     case "ask":
       return <AskDoctor about={String((p as { about?: string }).about ?? "")} close={close} />;
     case "pin":
