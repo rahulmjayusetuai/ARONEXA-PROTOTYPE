@@ -310,8 +310,47 @@ async function downloadAllData() {
 }
 
 let speaking = false;
+let narration: HTMLAudioElement | null = null;
+
+// Cards whose summary has a narrated recording, in the same voice as the explainer videos.
+const NARRATED: [RegExp, string][] = [[/heart tracing \(ECG\)/, "/video/explain-heart-tracing-ecg.mp3"]];
+
+// The recording for the card around a Listen button: the nearest enclosing card that names a narrated report.
+function narrationFor(node?: DesignNode) {
+  const root = screenDoc();
+  if (!node || !root) return undefined;
+  const path: DesignNode[] = [];
+  const walk = (n: DesignNode): boolean => {
+    path.push(n);
+    if (n.id === node.id || n.ch?.some(walk)) return true;
+    path.pop();
+    return false;
+  };
+  if (!walk(root)) return undefined;
+  for (const card of [...path].reverse().slice(0, 4)) {
+    const text = collectText(card).join(" ");
+    const hit = NARRATED.find(([pattern]) => pattern.test(text));
+    if (hit) return hit[1];
+  }
+  return undefined;
+}
 
 function readAloud(ctx: ActionContext) {
+  if (narration && !narration.paused) {
+    narration.pause();
+    narration = null;
+    return say("Stopped reading.");
+  }
+  const recording = narrationFor(ctx.node);
+  if (recording) {
+    narration = new Audio(recording);
+    narration.onended = () => {
+      narration = null;
+    };
+    void narration.play().catch(() => say("Press Listen again to play the summary."));
+    toast("PToast / listen");
+    return;
+  }
   const speech = window.speechSynthesis;
   if (!speech) return say("This browser can’t read aloud.");
   if (speaking) {
@@ -640,6 +679,8 @@ function runFx(name: string, arg: string | undefined, ctx: ActionContext) {
       const [id, title, field, original] = (arg ?? "").split("|");
       return live.openModal("value", { title, label: field, value: live.texts[id] ?? original, nodeId: id });
     }
+    case "reel":
+      return live.openModal("reel", JSON.parse(arg ?? "{}") as Record<string, unknown>);
     case "share":
       void navigator.clipboard?.writeText(window.location.href).catch(() => undefined);
       return say(arg ?? "Link copied.");

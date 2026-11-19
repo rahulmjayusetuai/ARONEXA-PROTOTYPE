@@ -2,6 +2,8 @@ import type { DesignNode } from "../types";
 import { isPatientScreen, patientDoc } from "./patient";
 import { baseAppointments, collectedExtra, TODAY } from "./schedule";
 import { useLive } from "./state";
+import EXPLAIN_AUDIO from "./explain-audio.json";
+import manifest from "../manifest.json";
 
 type Live = ReturnType<typeof useLive.getState>;
 
@@ -491,14 +493,14 @@ function notifications(root: DesignNode, name: string) {
   });
 }
 
-// The Malayalam voice needs longer on the second and third scenes than the design's storyboard gives them.
+// The Malayalam voice needs longer on each scene than the design's storyboard gives them.
 const VIDEOS: Record<string, { file: string; lang: "en" | "ml"; other: string; times?: Record<string, string> }> = {
   "Modal / video preview · heart tracing (ECG)": { file: "heart-tracing-ecg", lang: "en", other: "368:7095" },
   "Modal / video preview · heart tracing (ECG) (Malayalam)": {
     file: "heart-tracing-ecg-ml",
     lang: "ml",
     other: "368:6512",
-    times: { "0:00 to 0:08": "0:00 to 0:04", "0:08 to 0:22": "0:04 to 0:19", "0:22 to 0:30": "0:19 to 0:30" },
+    times: { "0:00 to 0:08": "0:00 to 0:04", "0:08 to 0:22": "0:04 to 0:22", "0:22 to 0:30": "0:22 to 0:34" },
   },
 };
 
@@ -530,6 +532,26 @@ function videoPlayer(root: DesignNode, name: string) {
   }
   bar.live = "player";
   bar.props = { lines };
+  const audio = (EXPLAIN_AUDIO as Record<string, { file: string; starts: number[]; length: number }>)[name];
+  if (audio) {
+    // A narrated track in the patient's language. The storyboard's times follow the voice.
+    // The same explainer in the other language is its own screen, so the switch moves to it.
+    const ml = name.endsWith(" (Malayalam)");
+    const otherName = ml ? name.slice(0, -" (Malayalam)".length) : `${name} (Malayalam)`;
+    const other = manifest.screens.find((s) => s.name === otherName)?.id;
+    bar.props = { lines, src: `/video/${audio.file}.mp3`, length: audio.length, lang: ml ? "ml" : "en", other };
+    const clock = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+    const ends = [...audio.starts.slice(1), audio.length];
+    let scene = 0;
+    const retime = (n: DesignNode) => {
+      if (n.n === "Time" && n.tx && / to /.test(n.tx.v) && scene < ends.length) {
+        n.tx.v = `${clock(scene ? Math.round(audio.starts[scene]) : 0)} to ${clock(Math.round(ends[scene]))}`;
+        scene += 1;
+      }
+      n.ch?.forEach(retime);
+    };
+    retime(root);
+  }
   bar.ch = [];
 }
 
