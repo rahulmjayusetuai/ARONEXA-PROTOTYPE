@@ -74,6 +74,7 @@ export type DesignNode = {
   role?: string;
   pressed?: boolean;
   anim?: string;
+  ms?: number;
 };
 
 export type Area = "patient" | "pharmacy" | "clinic" | "lab" | "rider" | "team" | "partner";

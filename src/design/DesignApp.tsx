@@ -6,11 +6,55 @@ import { LiveModals } from "./live/Modals";
 import { playLeave, softenContent } from "./live/motion";
 import { restoreLive, useLive } from "./live/state";
 import { liveDoc, liveKey } from "./live/transform";
+import { reflow } from "./mobile";
 import { NodeView } from "./Node";
 import { load, loaded, manifest, screensById, screensBySlug, showFromHistory, useDesign, type Overlay } from "./store";
 import type { DesignNode, InstanceRef } from "./types";
 
 const NO_ANCESTORS: InstanceRef[] = [];
+
+// Below this width the page is rearranged for a phone instead of shrunk.
+const PHONE = 760;
+function usePhoneWidth() {
+  const [w, setW] = useState<number | null>(null);
+  useEffect(() => {
+    const update = () => {
+      // ?phone=390 forces a phone width, for checking the layout on a computer.
+      const forced = Number(new URLSearchParams(window.location.search).get("phone")) || 0;
+      const cw = forced || document.documentElement.clientWidth;
+      setW(cw < PHONE ? cw : null);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  return w;
+}
+
+// Tells phone visitors the full experience is on a computer; closing it lasts for the visit.
+function PhoneNote() {
+  // Only shown once the phone width is known in the browser, so storage can be read here.
+  const [open, setOpen] = useState(() => {
+    try {
+      return sessionStorage.getItem("aronexa-phone-note") !== "closed";
+    } catch {
+      return true;
+    }
+  });
+  if (!open) return null;
+  const close = () => {
+    setOpen(false);
+    try {
+      sessionStorage.setItem("aronexa-phone-note", "closed");
+    } catch {}
+  };
+  return (
+    <div className="fg-phone-note" role="status">
+      <span>AroNexa is designed for computers. For the full experience, open this link on a laptop or desktop.</span>
+      <button type="button" aria-label="Close" onClick={close}>✕</button>
+    </div>
+  );
+}
 
 function useZoom() {
   const [zoom, setZoom] = useState(1);
@@ -65,10 +109,11 @@ const shownData = (s: ReturnType<typeof useLive.getState>) =>
 
 const isToast = (id: string) => /^(P|Ph|Rc|Ca|Lb|Pa|Pl|Sp|In|Dl|Sl|Rider)?Toast/.test(screensById.get(id)?.name ?? "");
 
-function OverlayView({ overlay, zoom }: { overlay: Overlay; zoom: number }) {
+function OverlayView({ overlay, zoom, phone }: { overlay: Overlay; zoom: number; phone: number | null }) {
   const closeOverlay = useDesign((s) => s.closeOverlay);
-  const node = useLiveDoc(overlay.id);
+  const raw = useLiveDoc(overlay.id);
   const toast = isToast(overlay.id);
+  const node = useMemo(() => (raw && phone ? reflow(raw, phone - 24) : raw), [raw, phone]);
   if (!node) return null;
   const view = { ...node, x: 0, y: 0 };
   if (toast) {
@@ -98,6 +143,7 @@ export function DesignApp({ path }: { path: string }) {
   const notice = useDesign((s) => s.notice);
   const setNotice = useDesign((s) => s.setNotice);
   const fullZoom = useZoom();
+  const phone = usePhoneWidth();
   const [ready, setReady] = useState<string | null>(null);
   const theme = useLive((s) => s.theme);
 
@@ -175,8 +221,11 @@ export function DesignApp({ path }: { path: string }) {
   const pageDoc = calendar ? behindDoc : doc;
   const size = screensById.get(pageId);
   // The rider app is a phone design, so it keeps its own size instead of filling a wide window.
-  const zoom = size && size.w < 600 ? Math.min(1, (fullZoom * 1440) / size.w) : fullZoom;
-  if (!pageDoc || !size) return <div className="fg-loading">Loading…</div>;
+  const desktopZoom = size && size.w < 600 ? Math.min(1, (fullZoom * 1440) / size.w) : fullZoom;
+  const zoom = phone ? 1 : desktopZoom;
+  const shownDoc = useMemo(() => (pageDoc && phone ? reflow(pageDoc, phone) : pageDoc), [pageDoc, phone]);
+  const calNode = useMemo(() => (calendar && phone ? reflow(calendar.node, phone) : calendar?.node), [calendar, phone]);
+  if (!pageDoc || !size || !shownDoc) return <div className="fg-loading">Loading…</div>;
   const area = screensById.get(screen)?.module ?? "doctor";
   // Rider and team have no guide video yet.
   const guideArea = area === "partner" ? partnerGuide(screensById.get(screen)?.name ?? "") : GUIDED.includes(area as GuideArea) ? (area as GuideArea) : null;
@@ -184,18 +233,18 @@ export function DesignApp({ path }: { path: string }) {
   return (
     <>
       {/* Keyed by page, so opening the calendar over a page doesn't rebuild that page. */}
-      <div className="fg-page" inert={Boolean(calendar)} style={{ zoom, position: "relative", width: size.w, height: pageDoc.h, margin: "0 auto" }} data-screen={screensById.get(screen)?.slug}>
-        <NodeView key={pageId} node={pageDoc} ancestors={NO_ANCESTORS} />
+      <div className="fg-page" inert={Boolean(calendar)} style={{ zoom, position: "relative", width: phone ? shownDoc.w : size.w, height: shownDoc.h, margin: "0 auto" }} data-screen={screensById.get(screen)?.slug}>
+        <NodeView key={pageId} node={shownDoc} ancestors={NO_ANCESTORS} />
       </div>
       {calendar && (
         <div className="fg-calendar-layer">
-          <div style={{ zoom, position: "relative", overflow: "hidden", width: size.w, height: calendar.height, minHeight: `calc(100dvh / ${zoom})`, margin: "0 auto" }}>
-            <NodeView node={calendar.node} ancestors={NO_ANCESTORS} />
+          <div style={{ zoom, position: "relative", overflow: "hidden", width: phone ? calNode!.w : size.w, height: phone ? calNode!.h : calendar.height, minHeight: `calc(100dvh / ${zoom})`, margin: "0 auto" }}>
+            <NodeView node={calNode!} ancestors={NO_ANCESTORS} />
           </div>
         </div>
       )}
       {overlays.map((o) => (
-        <OverlayView key={o.key} overlay={o} zoom={zoom} />
+        <OverlayView key={o.key} overlay={o} zoom={zoom} phone={phone} />
       ))}
       <LiveModals />
       {guideArea && (
@@ -205,6 +254,7 @@ export function DesignApp({ path }: { path: string }) {
         />
       )}
       {notice && <div className="fg-notice" role="status">{notice}</div>}
+      {phone && <PhoneNote />}
     </>
   );
 }

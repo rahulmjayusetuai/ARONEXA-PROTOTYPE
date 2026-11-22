@@ -250,7 +250,7 @@ function InstanceNode({ node, parent, ancestors, overlay }: Props) {
     const variant = swapped ? loaded.get(swapped) : undefined;
     if (!variant) return node;
     // Keeps the instance's own width, which fits its label, so a chip can't clip its text.
-    return { ...keepOverrides(variant, node), id: node.id, x: node.x, y: node.y, w: node.w, t: node.t, cid: swapped };
+    return { ...keepOverrides(variant, node), id: node.id, x: node.x, y: node.y, w: node.w, t: node.t, cid: swapped, ms: node.ms };
   }, [node, swapped]);
   const smart = swapped && smartMs ? smartMs : undefined;
   const chain = useMemo(
@@ -296,6 +296,11 @@ function Box({ node, parent, ancestors, overlay, smartMs }: Props & { smartMs?: 
   };
   if (node.o !== undefined) style.opacity = node.o;
   if (node.ro) style.transform = `rotate(${node.ro}deg)`;
+  // Phone view: a part that can't be rearranged is shrunk to fit.
+  if (node.ms) {
+    style.transform = `${style.transform ?? ""} scale(${node.ms})`.trim();
+    style.transformOrigin = "0 0";
+  }
   if (node.b) style.mixBlendMode = node.b as CSSProperties["mixBlendMode"];
 
   if (node.live) return <LiveWidget node={node} style={style} />;
